@@ -1,0 +1,40 @@
+
+Work Items for World-O-Music
+=============================
+
+Software
+---------
+Rework NMEA parsing code to generate binary numbers with known bit variation
+
+Write utility bit-extraction functions
+
+Write GPS simulation for dev purposes
+
+Extend tune structure to do per-note volumes 
+
+Sort out our terminology for notes & voices and fix the code
+
+Build tune generation, varying:
+ - Speed
+ - Notes in use
+ - Specific notes in tune
+ - Rhythm
+ - Stress
+ - Time signature ?
+ - Voices in use ? 
+ 
+Equalise volumes of the various voices
+
+
+Hardware
+---------
+
+Measure current consumption of the hardware, work out if low-pass-filtering the PWM signal will save power
+
+Pick a battery pack to get a decent runtime
+
+Find an amp/speaker
+
+Find tube to fit parts
+
+Build case
