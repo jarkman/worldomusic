@@ -45,10 +45,9 @@ void loop ()
 {
   progressEnvelopes();
   
-  progressTune();
-  
-  decode_gps();  //Reads and average the sensors when is doing nothing...
+    decode_gps();  //Reads and average the sensors when is doing nothing...
 
+  if( progressTune()) // only make a new tune when the old one finishes
    buildTuneFromPosition();
 }
 
@@ -104,7 +103,10 @@ void presetVoices()
    int beatMillisecs = 100 + (5 * bitList( latWhiskers, "0000 0000 0000 0000 0000 0011 1111" )); 
 
    int numBeats = 3 + bitList( lonWhiskers, "0000 0000 0000 0000 0000 0001 1111" ); // 0 to 32
-   int barLength = 2 + bitList( lonWhiskers, "0000 0000 0000 0000 0000 0001 0010" ); 
+   
+   int barLength = 2 + bitList( lonWhiskers, "0000 0000 0000 0000 0000 0001 0011" ); 
+   
+   numBeats = 3 * barLength;
    
    //unsigned long beatMask = (bitList( lonWhiskers, "0000 0000 0000 1111 1111 1111 1111" ) << 16)
    //                          | (bitList( latWhiskers, "0000 0000 0000 1111 1111 1111 1111" ));

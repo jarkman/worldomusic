@@ -55,12 +55,12 @@ void tuneAddNote( int noteNumber,unsigned char  volume, int beat, int voice )
    tuneNoteCount++;
 }
 
-void progressTune() // called from loop() repeatedly - work out if a note is due, and start it
+int progressTune() // called from loop() repeatedly - work out if a note is due, and start it
 {
   long now = millis();
   
   if( now < tuneNextBeatTime )
-    return;
+    return 0;
 
    // find all the notes in the list which are due at this beat and start them
    while( tuneNextListIndex < tuneNoteCount && tuneListBeat[ tuneNextListIndex ] <= tuneNextBeat )
@@ -90,7 +90,7 @@ void progressTune() // called from loop() repeatedly - work out if a note is due
     tuneNextBeat = 0;
   }
   
-  
+  return tuneNextBeat == 0; // just begun!
 }
 
 void logTuneProgress()

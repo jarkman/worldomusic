@@ -7,7 +7,7 @@ extern void tuneDelete(); // destroy the existing tune
 
 extern void tuneAddNote( int noteNumber, unsigned char volume, int beat, int voice );
 
-extern void progressTune(); // called from loop() repeatedly - work out if a note is due, and start it
+extern int progressTune(); // called from loop() repeatedly - work out if a note is due, and start it
 
 
 extern void tuneSetBeatInterval( int time );
