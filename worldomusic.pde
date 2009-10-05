@@ -43,6 +43,8 @@ void setup ()
 
 void loop ()
 {
+  progressEnvelopes();
+  
   progressTune();
   
   decode_gps();  //Reads and average the sensors when is doing nothing...
@@ -57,9 +59,9 @@ void presetVoices()
   tuneSetVoice (1, VOICE_SINE);
   tuneSetVoice (2, VOICE_VIBRA);
   
-  tuneSetVolumeDelta (0, 600);
-  tuneSetVolumeDelta (1, 600);
-  tuneSetVolumeDelta (2, 300);
+  tuneSetEnvelopeDelta (0, 600);
+  tuneSetEnvelopeDelta (1, 600);
+  tuneSetEnvelopeDelta (2, 300);
   
   tuneSetVibratoPercent (0, 15);
   
@@ -92,6 +94,7 @@ void presetVoices()
     //buildTestTune();
  }
  
+
  void buildTune()
  {
    
@@ -101,22 +104,30 @@ void presetVoices()
    int beatMillisecs = 100 + (5 * bitList( latWhiskers, "0000 0000 0000 0000 0000 0011 1111" )); 
 
    int numBeats = 3 + bitList( lonWhiskers, "0000 0000 0000 0000 0000 0001 1111" ); // 0 to 32
+   int barLength = 2 + bitList( lonWhiskers, "0000 0000 0000 0000 0000 0001 0010" ); 
    
    //unsigned long beatMask = (bitList( lonWhiskers, "0000 0000 0000 1111 1111 1111 1111" ) << 16)
    //                          | (bitList( latWhiskers, "0000 0000 0000 1111 1111 1111 1111" ));
    
-   unsigned long beatMask = mixBits( lonWhiskers,  latWhiskers );
+   unsigned long beatMask = mixBits( lonWhiskers,  latWhiskers );  // alternate bits from the bottom 16 of the two coords
    
-  
+ 
    tuneDelete();
     
    tuneSetBeatInterval( beatMillisecs ); 
   
+    int volume;
    int beat;
    for( beat = 0; beat < numBeats; beat ++ )
    {
-       if( bitIsSet( beatMask, beat ))
-         tuneAddNote( 60 + (3 * (beat%2)), beat, 0 );
+       boolean firstBeat = ((beat % barLength) == 0 ) ; // stress the first note of the 'bar'
+       if( firstBeat )
+         volume = MAXVOLUME; // loudest
+       else
+         volume = 2; // quieter
+         
+       if( bitIsSet( beatMask, beat ) || firstBeat )
+         tuneAddNote( 60 + (3 * (beat%2)), volume, beat, 0 );
        
    }
  }
@@ -133,12 +144,12 @@ void presetVoices()
    {
      
      if( beat%3 == 0 )
-        tuneAddNote( 50 + beat, beat, 0 );
+        tuneAddNote( 50 + beat,  MAXVOLUME, beat, 0 );
       
-      tuneAddNote( 60 + (3 * (beat%2)), beat, 1 );
+      tuneAddNote( 60 + (3 * (beat%2)), MAXVOLUME, beat, 1 );
       
       if( beat%5 == 0 )
-        tuneAddNote( 50 + beat%2, beat, 2 );
+        tuneAddNote( 50 + beat%2, MAXVOLUME, beat, 2 );
    }
  }
  

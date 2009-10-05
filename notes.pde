@@ -22,7 +22,9 @@
 
 // respect the sweep parameter to start_note
 
-#include "notes.h"
+//#include "notes.h"
+
+unsigned char noteVolume[NOTES];             // overall note volume
 
 unsigned char noteWorking[NOTES]; // Flag, non-zero to indicate note is active; zeroed when envelope decays to 0 
 long int noteStartTime[NOTES];    // Note start timestamp, in milliseconds
@@ -33,6 +35,7 @@ unsigned char noteVoice[NOTES];   // Which voice to use for this note, 0..MAXVOI
 uint16_t notePhase[NOTES];        // Phase in range 0..65535
 int16_t notePhaseDelta[NOTES];    // Add to phase every 32 microseconds (at 31.25kHz PWM frequency)
 
+
 #ifdef DO_SWEEP
 // Sweeping notes (variable frequency)
 int16_t noteSweepTicksTotal[NOTES];   // number of 32k ticks per increment of phaseDelta
@@ -41,23 +44,17 @@ int16_t noteSweepTarget[NOTES]; // target value of phaseDelta for the sweep
 #endif
 
 // Notes with variable amplitude (envelope shaping)
-unsigned int noteVolume[NOTES];      // Envelope phase accumulator for this note 
-unsigned int noteVolumeDelta[NOTES]; // Add to amplitude every 8 milliseconds (at 31.25kHz PWM frequency)
+unsigned int envelopePhase[NOTES];      // Envelope phase accumulator for this note 
+unsigned int envelopePhaseDelta[NOTES]; // Add to amplitude every 8 milliseconds (at 31.25kHz PWM frequency)
 unsigned char noteEnv[NOTES];        // Note envelope 0..255
 unsigned short int noteEnvOffset[NOTES]; // Offset from start of envelope ROM array
 
-#ifdef DO_OVERTONES
-// note overtones
-int16_t overtoneVolume[NOTES];  // volume of the overtone component of this note 
-int16_t overtoneVolumeDelta[NOTES]; // subtract from overtoneVolume every 8 milliseconds (at 31.25kHz PWM frequency)
-#endif
 
 #ifdef DO_VIBRATO
 int16_t vibratoOffset[NOTES];
 int16_t vibratoCounter = 0;
 #endif
 
-uint8_t volumeCounter = 0;   // Only compute amplitude changes every 256 PWM cycles, i.e. every 8ms
 
 #if defined(__AVR_ATmega8__)
 //
@@ -329,25 +326,8 @@ PROGMEM prog_uchar env[MAXENVELOPES * 256] = {
     0,   0,   0,   0,   0,   0,   0,   0
 };
 
-#ifdef DO_OVERTONES
-//the same wave with the overtones (and undertone) baked in
-char overtone[] = {0,107,118,127,118,92,52,-8,17,46,-6,-36,-56,-67,-70,-80,0,80,70,67,56,36,6,-46,-17,8,-52,-92,-118,-127,-118,-107};
-#endif
 
-#ifdef DO_ANTILOG
-// Smooth logarithmic mapping
-//
-uint16_t antilogTable[] = {
-  64830,64132,63441,62757,62081,61413,60751,60097,59449,58809,58176,57549,56929,56316,55709,55109,
-  54515,53928,53347,52773,52204,51642,51085,50535,49991,49452,48920,48393,47871,47356,46846,46341,
-  45842,45348,44859,44376,43898,43425,42958,42495,42037,41584,41136,40693,40255,39821,39392,38968,
-  38548,38133,37722,37316,36914,36516,36123,35734,35349,34968,34591,34219,33850,33486,33125,32768
-};
 
-uint16_t mapPhaseInc(uint16_t input) {
-  return (antilogTable[input & 0x3f]) >> (input >> 6);
-}
-#endif
 
 // Stepped chromatic mapping
 // n = (65536 * freq) / 31250
@@ -423,6 +403,7 @@ static void clearNotes (void)
   
     noteNumber[i] = 0;  // midi note number
     noteVoice[i] = 0;   // default to voice 0
+    noteVolume[i] = 0;
   
     notePhase[i] = 0;  // phase in range 0->64k
     notePhaseDelta[i] = 0; // add to phase every 32 microseconds (at 31.25kHz PWM frequency)
@@ -435,16 +416,12 @@ static void clearNotes (void)
 #endif
 
     // volume-changing notes
-    noteVolume[i] = 0;  // volume of this note 
-    noteVolumeDelta[i] = 0; // subtract from volume every 32 microseconds (at 31.25kHz PWM frequency)
+    envelopePhase[i] = 0;  // volume of this note 
+    envelopePhaseDelta[i] = 0; // subtract from volume every 32 microseconds (at 31.25kHz PWM frequency)
     noteEnvOffset[i] = 0;
     noteEnv[i] = 0;
   
-#ifdef DO_OVERTONES
-    // note overtones
-    overtoneVolume[i] = 0;  // volume of the overtone component of this note 
-    overtoneVolumeDelta[i] = 0; // subtract from overtoneVolume every 32 microseconds (at 31.25kHz PWM frequency)
-#endif
+
   
 #ifdef DO_VIBRATO
     vibratoOffset[i] = 0;
@@ -455,7 +432,7 @@ static void clearNotes (void)
 
 /* startNote --- start a note playing with a given MIDI note number, voice and envelope */
 
-void startNote (int note, int midiNoteNumber, int voice, int volumeDelta, int envelope, int sweepMillisecs, int vibratoPercent)
+void startNote (int note, int midiNoteNumber, unsigned char volume, int voice, int envelopeDelta, int envelope, int sweepMillisecs, int vibratoPercent)
 {
   if ((note >= NOTES) || (voice >= MAXVOICES))
     return;
@@ -467,6 +444,8 @@ void startNote (int note, int midiNoteNumber, int voice, int volumeDelta, int en
   
   noteNumber[note] = midiNoteNumber;
   noteVoice[note] = voice;
+  noteVolume[note] = volume;
+  
   notePhase[note] = 0;
   
   int16_t basePhaseDelta = mapMidi (midiNoteNumber); // a notePhaseDelta of 2048 gives you 1kHz here
@@ -487,7 +466,7 @@ void startNote (int note, int midiNoteNumber, int voice, int volumeDelta, int en
       noteSweepTicksTotal[note] = (sweepMillisecs << 5) / (noteSweepTarget[note] - notePhaseDelta[note]);
     //noteSweepDelta[note] = (noteSweepTarget[note] - notePhaseDelta[note]) / (sweepMillisecs >> 3); // sweepMillisecs * 32 / 256
     //if( noteTicksTotal[note] == 0 ) // can't go slow enough - note will never finish
-    //  volumeDelta = 100; // make the
+    //  envelopeDelta = 100; // make the
       
     noteSweepTicker[note] = 0;
   }
@@ -496,8 +475,8 @@ void startNote (int note, int midiNoteNumber, int voice, int volumeDelta, int en
   notePhaseDelta[note] = basePhaseDelta;
 #endif
       
-  if (volumeDelta == 0) // forbid endless notes for the convenience of my random-note generation scheme
-    volumeDelta = 1; 
+  if (envelopeDelta == 0) // forbid endless notes for the convenience of my random-note generation scheme
+    envelopeDelta = 1; 
 
 #ifdef DO_VIBRATO
   vibratoOffset[note] = basePhaseDelta >> 3; // we will add this to phaseDelta for half the vibrato cycle and subtract it for the other half
@@ -508,20 +487,12 @@ void startNote (int note, int midiNoteNumber, int voice, int volumeDelta, int en
 
   noteEnvOffset[note] = envelope * 256;  
   noteEnv[note] = 255;
-  noteVolume[note] = 0;  // Initialise envelope phase accumulator
-  noteVolumeDelta[note] = volumeDelta; // Add to volume every 8 msec
+  envelopePhase[note] = 0;  // Initialise envelope phase accumulator
+  envelopePhaseDelta[note] = envelopeDelta; // Add to volume every 8 msec
                                        // a value of 256 gives a 1-second envelope
   
-#ifdef DO_OVERTONES  
-  // experiment with the scaling in here to get different effects from the overtone component     
-  overtoneVolume[note]   = noteVolume[ note ]  >> 1;        // overtone starts at the same volume than the fundamental
-  overtoneVolumeDelta[note] = noteVolumeDelta[ note ] >> 1; // but decays slowly  
 
-  noteVolumeDelta[note] <<= 3; // this makes the fundamental decay quickly, so we get a ping
 
-  if (overtoneVolumeDelta[note] < 1)
-    overtoneVolumeDelta[note] = 1  ; // guard against endless drone!
-#endif
 }
 
 
@@ -537,8 +508,8 @@ int quietestNote (void)
     if (noteFinished (i))
       return (i);
     
-    if (minVolume > noteVolume[i]) {
-        minVolume = noteVolume[i];  
+    if (minVolume > envelopePhase[i]) {
+        minVolume = envelopePhase[i];  
         minNote = i;
     }
   }
@@ -551,16 +522,16 @@ int quietestNote (void)
 
 int noteFinished (int note)
 {
-  return noteVolume[note] == 65535U ||
+  return envelopePhase[note] == 65535U ||
           (! noteWorking[note]) || 
           millis() - noteStartTime[note] > 500 ; // so notes with no volume or pitch sweep still finish
-  //return noteVolume[note] <= 0;
+  //return envelopePhase[note] <= 0;
 }
 
 
 /* startNoteStep --- not used, but needs updating */
-
-void startNoteStep (int note, int noteDelta, int minNoteNumber, int maxNoteNumber , int volumeDelta)
+/*
+void startNoteStep (int note, int noteDelta, int minNoteNumber, int maxNoteNumber , int envelopeDelta)
 {
   int n = noteNumber[note] + noteDelta;
   
@@ -570,23 +541,55 @@ void startNoteStep (int note, int noteDelta, int minNoteNumber, int maxNoteNumbe
   if (n > maxNoteNumber)
      n = minNoteNumber;
     
-   startNote (note, n, 0, volumeDelta, 0, 200, 25); 
+   startNote (note, n, 0, envelopeDelta, 0, 200, 25); 
 }
+*/
 
+long nextProgressEnvelopeTime = 0;
 
+void progressEnvelopes() // must be called from loop() 
+{
+  int e;
+  long now = millis();
+  
+  if( now < nextProgressEnvelopeTime )
+    return;
+    
+   nextProgressEnvelopeTime = now + 8L;
+    
+  for (int i = 0; i < NOTES; i++)
+  {
+      // Process volume every 256 times round the loop so we can have decent note lengths.
+      // We go through here every 32*256 microsecs, 8 millisecs, 128 times / sec.
+      // Apply envelope shaping to the note fundamental volume.
+      if (envelopePhase[i] < (65535U - envelopePhaseDelta[i])) 
+      {
+        envelopePhase[i] += envelopePhaseDelta[i];
+        e = envelopePhase[i] >> 8;
+        e += noteEnvOffset[i];
+        noteEnv[i] = pgm_read_byte_near (env + e);
+      }
+      else 
+      {
+        noteWorking[i] = 0;
+        noteEnv[i] = 0;
+        envelopePhase[i] = 65535U; // Note is done
+      }
+    }   
+  }
+      
 SIGNAL(PWM_INTERRUPT)  // every 32 microsecs, i.e. 31.25kHz
 {
   int16_t fundamentalValue;
-#ifdef DO_OVERTONES
-  int16_t overtoneValue;
-#endif
+
   int16_t output = 0;
   char i;
   int e;
   
-  volumeCounter++;
+
  
   for (i = 0; i < NOTES; i++) {
+    
     notePhase[i] += notePhaseDelta[i]; // we just let it wrap when it overflows
   
 #ifdef DO_VIBRATO
@@ -600,13 +603,8 @@ SIGNAL(PWM_INTERRUPT)  // every 32 microsecs, i.e. 31.25kHz
                                             // value is in range -127..127
     fundamentalValue *= noteEnv[i];   // Apply envelope shaping
     
-#ifdef DO_OVERTONES
-    overtoneValue = overtone[ notePhase[i] >> 11 ];  // gets from 16-bit down to our 5-bit wave table
-                                          // value is in range -127..127
-    overtoneValue = overtoneValue * (overtoneVolume[i] >> 8) ; 
-    
-    fundamentalValue += overtoneValue;
-#endif
+    //noteVolume[i] = 1;
+    fundamentalValue *= noteVolume[i];
     
 #ifdef DO_SWEEP
     if( noteSweepTicksTotal[i] != 0 )
@@ -631,35 +629,12 @@ SIGNAL(PWM_INTERRUPT)  // every 32 microsecs, i.e. 31.25kHz
     }        
 #endif
     
-    if (volumeCounter == 0) {
-      // Process volume every 256 times round the loop so we can have decent note lengths.
-      // We go through here every 32*256 microsecs, 8 millisecs, 128 times / sec.
-      // Apply envelope shaping to the note fundamental volume.
-      if (noteVolume[i] < (65535U - noteVolumeDelta[i])) {
-        noteVolume[i] += noteVolumeDelta[i];
-        e = noteVolume[i] >> 8;
-        e += noteEnvOffset[i];
-        noteEnv[i] = pgm_read_byte_near (env + e);
-      }
-      else {
-        noteWorking[i] = 0;
-        noteEnv[i] = 0;
-        noteVolume[i] = 65535U; // Note is done
-      }
-      
-#ifdef DO_OVERTONES  
-      // and update the overtone volume
-      if (overtoneVolume[i] > overtoneVolumeDelta[i])
-        overtoneVolume[i] -= overtoneVolumeDelta[i];
-      else
-        overtoneVolume[i] = 0; 
-#endif
-    }
+  
     
-    // Here we should really divide 'fundamentalValue' by NOTES, but
-    // dividing by four (by shifting) is much faster
-    output += (fundamentalValue >> 2); // Sum the notes to get the total output
-  }
+
+    output += (fundamentalValue >> 3); // Sum the notes to get the total output
+    
+  } // end loop over NOTES
  
 #ifdef DO_VIBRATO
   if (volumeCounter == 0) { 

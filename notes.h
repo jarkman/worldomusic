@@ -3,15 +3,14 @@
 #define NOTES (3)        // The maximum number of notes we can play simultaneously    
 #define MAXVOICES (6)    // Maximum number of voices
 #define MAXENVELOPES (6) // Maximum number of envelopes
-#define NOTE_OVERFLOW_SHIFT 1  // increase this if turning up NOTES results in clipping - suggest 
-// 4 -> 1
-// 12 -> 2
+
+
+#define MAXVOLUME 4
+
 
 // Turning these features on reduces the maximum workable value of NOTES !
-//#define DO_OVERTONES  // turning this on makes the sound more interesting, but reduces the number of notes we can play to about 3
 //#define DO_VIBRATO    // fixed vibrato on all notes
 //#define DO_SWEEP      // sweep from one note to the next
-//#define DO_ANTILOG    // I've no idea what this does, but it uses up RAM if switched on -- John
 
 #define VOICE_SINE      (0)    // Simple sine wave
 #define VOICE_SQUARE    (1)    // Simple square wave
@@ -31,4 +30,5 @@ extern uint16_t maxMidi;
 
 extern void setupNotes (void);
 
-extern void startNote (int note, int midiNoteNumber, int voice, int volumeDelta, int envelope, int sweepMillisecs, int vibratoPercent);
+extern void startNote (int note, int midiNoteNumber, unsigned char volume, int voice, int envelopeDelta, int envelope, int sweepMillisecs, int vibratoPercent);
+extern void progressEnvelopes();
