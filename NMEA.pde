@@ -20,6 +20,10 @@ int gpsStatus = GPS_STATUS_NO_COMMS;
 
 float lat=0; // store the Latitude from the gps
 float lon=0;// Store guess what?
+
+unsigned long latWhiskers =0L;  // in whiskers, which are 0.0001 minutes
+unsigned long lonWhiskers =0L;
+
 float alt_MSL=0; //This is the alt.
 float ground_speed=0;// This is the velocity your "plane" is traveling in meters for second, 1Meters/Second= 3.6Km/H = 1.944 knots
 float ground_course=0;//This is the runaway direction of you "plane" in degrees
@@ -52,6 +56,10 @@ const float t7=1000000.0;
 #define LOCOSYS_BAUD_RATE_115200 "$PMTK251,115200*1F\r\n"
 
 #define LOCOSYS_FACTORY_RESET "$PMTK104*37\r\n"
+
+float dec_min_to_dec_deg(char *token );
+unsigned long dec_min_to_whiskers(char *token );
+
 
 //#define LOCOSYS_SELECT_FIELDS "$PMTK314,0,1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*28\r\n" // this should turn Off all sentences except GGA and RMC
 // duplicated by NMEA_OUTPUT_5HZ above
@@ -134,8 +142,13 @@ so to get one note increment per resolution increment, multiply lat/long by 600,
 
 void decode_gps(void)
 {
+  #ifdef SIMULATE_GPS
+    simulate_gps();
+    return;
+  #endif
   
   #ifdef DO_LOGGING
+    // no point trying to se the serial port when logging is on
     return;
   #endif
     
@@ -216,6 +229,9 @@ void decode_gps(void)
             //Example: "50.1234/60=.835390", then add the degrees, ex: "47+.835390=47.835390" decimal degrees
             token = strtok_r(NULL, search, &brkb); //Contains Latitude in degrees decimal minutes... 
 
+            lat = dec_min_to_dec_deg( token );
+            latWhiskers = dec_min_to_whiskers( token );
+            /*
             //taking only degrees, and minutes without decimals, 
             //strtol stop parsing till reach the decimal point "."  result example 4750, eliminates .1234
             temp=strtol (token,&pEnd,10);
@@ -243,26 +259,33 @@ void decode_gps(void)
             //Then i add the degrees stored in "temp" and add the result from the first step, example 47+.835390=47.835390 
             //The result is stored in "lat" variable... 
             lat=temp+((float)temp3/600000);
-
+            */
 
             token = strtok_r(NULL, search, &brkb); //lat, north or south?
             //If the char is equal to S (south), multiply the result by -1.. 
             if(*token=='S'){
               lat=lat*-1;
+              latWhiskers += 0x8000000L;
             }
 
             //This the same procedure use in lat, but now for Lon....
             token = strtok_r(NULL, search, &brkb);
+            lon = dec_min_to_dec_deg( token );
+            lonWhiskers = dec_min_to_whiskers( token );
+
+            /*
             temp=strtol (token,&pEnd,10); 
             temp2=strtol (pEnd+1,NULL,10); 
             temp3=(temp*10000)+(temp2);
             temp3=temp3%1000000; 
             temp/=100;
             lon=temp+((float)temp3/600000);
-
+            */
+            
             token = strtok_r(NULL, search, &brkb); //lon, east or west?
             if(*token=='W'){
               lon=lon*-1;
+              lonWhiskers += 0x8000000L;
             }
 
             token = strtok_r(NULL, search, &brkb); //Speed overground?
@@ -360,6 +383,144 @@ void decode_gps(void)
       //gpsStatus = GPS_STATUS_NO_COMMS; 
     }  
 }
+
+#ifdef SIMULATE_GPS
+ char* simLatStrings[] = { "5142.0313",
+                           "5142.0314",
+                           "5142.0315",
+                           "5142.0316",
+                           "5142.0412",
+                           "5142.0544",
+                           "5142.0743",
+                           "5142.0900",
+                            NULL } ;
+                           
+ char* simLonStrings[] = { "00302.5582",
+                           "00302.5583",
+                           "00302.5584",
+                           "00302.5585",
+                           "00302.5222",
+                           "00302.5100",
+                           "00302.5022",
+                           "00302.5945",
+                           NULL };
+
+
+void simulate_gps()
+{
+  static long nextGPSSimTime = 0;
+  static int nextString = 0;
+  
+  long now = millis();
+  
+  if( now < nextGPSSimTime )
+    return; 
+    
+  // eg: lat 5142.0313  lon 00302.5582
+   
+   nextString ++;
+   if( simLatStrings[nextString] == NULL )
+     nextString = 0;
+   
+  latWhiskers = dec_min_to_whisker( simLatStrings[nextString] );
+  lonWhiskers = dec_min_to_whisker( simLonStrings[nextString] );
+  lonWhiskers += 0x8000000L; // typically west
+  
+  nextGPSSimTime = now + 6000;
+
+  #ifdef DO_LOGGING
+     Serial.print ("simulate_gps - lat, lon: ");
+           Serial.print ("\n");
+      Serial.print (simLatStrings[nextString]); 
+            Serial.print ("\n");
+     Serial.print (simLonStrings[nextString]); 
+           Serial.print ("\n");
+     
+     Serial.print (latWhiskers); 
+           Serial.print ("\n");
+      Serial.print (lonWhiskers); 
+      Serial.print ("\n");
+    #endif
+    
+}
+#endif
+
+float dec_min_to_dec_deg(char *token )
+{
+   unsigned long temp=0;
+  unsigned long temp2=0;
+  unsigned long temp3=0;
+  
+   //Token contains lat/lon in degrees, decimal minutes. 
+   // (ej. 4750.1234 degrees decimal minutes = 47.835390 decimal degrees)
+   //Where 47 are degrees and 50 the minutes and .1234 the decimals of the minutes.
+   //To convert to decimal degrees, devide the minutes by 60 (including decimals), 
+   //Example: "50.1234/60=.835390", then add the degrees, ex: "47+.835390=47.835390" decimal degrees
+
+ 
+   //taking only degrees, and minutes without decimals, 
+   //strtol stop parsing till reach the decimal point "."  result example 4750, eliminates .1234
+   temp=strtol (token,&pEnd,10);
+
+   //takes only the decimals of the minutes
+   //result example 1234. 
+   temp2=strtol (pEnd+1,NULL,10);
+
+   //joining degrees, minutes, and the decimals of minute, now without the point...
+   //Before was 4750.1234, now the result example is 47501234...
+   temp3=(temp*10000)+(temp2);
+
+
+   //modulo to leave only the decimal minutes, eliminating only the degrees.. 
+   //Before was 47501234, the result example is 501234.
+   temp3=temp3%1000000;
+
+
+   //Dividing to obtain only the de degrees, before was 4750 
+   //The result example is 47 (4750/100=47)
+   temp/=100;
+
+   //Joining everything and converting to float variable... 
+   //First i convert the decimal minutes to degrees decimals stored in "temp3", example: 501234/600000= .835390
+   //Then i add the degrees stored in "temp" and add the result from the first step, example 47+.835390=47.835390 
+   //The result is stored in "lat" variable... 
+   float deg = temp+((float)temp3/600000);
+            
+   return deg;
+}
+            
+unsigned long dec_min_to_whisker(char *token ) // where a whisker is 0.0001 minutes, which is our resolution
+{
+   unsigned long temp=0;
+   unsigned long whiskers=0;
+   unsigned long temp3=0;
+  
+   //Token contains lat/lon in degrees, decimal minutes. 
+   // (eg. 4750.1234 degrees decimal minutes = 47.835390 decimal degrees)
+   //Where 47 are degrees and 50 the minutes and .1234 the decimals of the minutes.
+
+ 
+   //taking only degrees, and minutes without decimals, 
+   //strtol stop parsing till reach the decimal point "."  result example 4750, eliminates .1234
+   temp=strtol (token,&pEnd,10);  // 4750
+   
+   unsigned long degs = temp / 100L;  // 47
+   unsigned long minutes = temp % 100L;  // 50
+   
+   //takes only the decimals of the minutes
+   //result example 1234. 
+   whiskers=strtol (pEnd+1,NULL,10);  // 1234
+
+   //joining degrees, minutes, and the decimals of minute, now without the point...
+   //Before was 4750.1234, now the result example is 47501234...
+   whiskers += minutes * 10000L;   // 501234
+   
+   whiskers += degs * 60L * 10000L; // 28,701,234
+
+
+   
+   return whiskers;  // max value is 108,000,000 0x66ff300, 27 bits, plus we will add a N/S or E/W to get 28 bits
+}  
 
 
 void Wait_GPS_Fix(void)//Wait GPS fix...

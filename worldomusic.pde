@@ -1,14 +1,23 @@
 
-/* pisano_full_fat --- generate polyphonic melodies from Pisano numbers */
+/* world'O'music - generate tunes from GPS location */
 
 #include <avr/io.h>
 #include "notes.h"
 #include "tune.h"
 #include "NMEA.h"
 
-#define DO_LOGGING // NB - logging and GPS usage are incompatible!
+#define DO_LOGGING // NB - logging and GPS usage are incompatible! Do not leave Serial.out lines in place when DO_LOGGING is off!
+#define SIMULATE_GPS
 
 //#define SIMULATE_TRIGGERS  // turn on to test when we don't have input hardware
+
+
+
+ unsigned long bitList( unsigned long whiskers, char*bits );
+ unsigned long bitRange( unsigned long whiskers, int lowBit, int highBit );
+ unsigned long mixBits( unsigned long left, unsigned long right );
+ 
+ int bitIsSet( unsigned long in, int bitNumber );
 
 /* setup --- do all the initialisation for the sketch */
 
@@ -62,18 +71,59 @@ void presetVoices()
  
  void buildTuneFromPosition()
  {
-   static int done = 0;
+   static unsigned long lastLat = 0;
+   static unsigned long lastLon = 0;
    
-   if( done ) //same position )
+   if( lonWhiskers == lastLon && latWhiskers == lastLat  ) //same position 
      return;
     
-    done = 1; 
+    lastLon = lonWhiskers;
+    lastLat = latWhiskers;
     
-    buildTestTune();
+    #ifdef DO_LOGGING
+     Serial.print ("buildTuneFromPosition - lat, lon: ");
+      Serial.print (latWhiskers, DEC); 
+      Serial.print (lonWhiskers, DEC); 
+      Serial.print ("\n");
+    #endif
+    
+    
+    buildTune();
+    //buildTestTune();
+ }
+ 
+ void buildTune()
+ {
+   
+   // the tune is built from latWhiskers and lonWhiskers
+   // Each of those has 28 interesting bits, of which the low bits are obviously the most interesting
+   
+   int beatMillisecs = 100 + (5 * bitList( latWhiskers, "0000 0000 0000 0000 0000 0011 1111" )); 
+
+   int numBeats = 3 + bitList( lonWhiskers, "0000 0000 0000 0000 0000 0001 1111" ); // 0 to 32
+   
+   //unsigned long beatMask = (bitList( lonWhiskers, "0000 0000 0000 1111 1111 1111 1111" ) << 16)
+   //                          | (bitList( latWhiskers, "0000 0000 0000 1111 1111 1111 1111" ));
+   
+   unsigned long beatMask = mixBits( lonWhiskers,  latWhiskers );
+   
+  
+   tuneDelete();
+    
+   tuneSetBeatInterval( beatMillisecs ); 
+  
+   int beat;
+   for( beat = 0; beat < numBeats; beat ++ )
+   {
+       if( bitIsSet( beatMask, beat ))
+         tuneAddNote( 60 + (3 * (beat%2)), beat, 0 );
+       
+   }
  }
  
  void buildTestTune()
  {
+   
    tuneDelete();
     
    tuneSetBeatInterval( 700 ); 
@@ -91,6 +141,71 @@ void presetVoices()
         tuneAddNote( 50 + beat%2, beat, 2 );
    }
  }
+ 
+ int bitIsSet( unsigned long in, int bitNumber )
+ {
+     return 0 != (in & (1L << bitNumber ));
+ }
+ 
+ unsigned long mixBits( unsigned long left, unsigned long right )  // build a 32-bit result from the bottom 16 bits of the arguments, alternated
+ {    
+   unsigned long out = 0L;
+   unsigned long inBit = 1L;
+   unsigned long outBit = 1L;
+   
+   for( int i = 0; i < 16; i ++)
+   {
+     if( left & inBit )
+       out |= outBit;
+       
+       outBit <<= 1;
+       
+       if( right & inBit )
+         out |= outBit;
+       
+       outBit <<= 1;
+       
+       inBit <<= 1;
+       
+   }
+   
+   return out;
+ }
+ 
+ 
+ unsigned long bitList( unsigned long in, char*bits )  // collect the specified bits form 'in' and put them into the lowest bits of 'out'
+ {
+     unsigned long out = 0L;
+     unsigned long inBit = 1L;
+     unsigned long outBit = 1L;
+     
+     for( int c = strlen( bits ) - 1; c >= 0; c -- )
+     {
+       if( bits[ c ] == '0' || bits[ c ] == '1' )
+       {
+         if( bits[ c ] == '1')  // if the string says this is a bit we want to represent in our answer
+         {
+            if( ( in & inBit ) != 0L )  // if the input number has a bit in this position
+               out |= outBit;            // put it in our answer
+           
+            outBit  = outBit << 1;
+         }
+         
+         inBit  = inBit << 1;
+       }
+     }
+     
+     return out;
+     
+ }
+ 
+ unsigned long bitRange( unsigned long whiskers, int lowBit, int highBit ) // bit numbers are inclusive, in the range 0-27
+ {
+     unsigned long mask = 0xFFFFFFFFL;
+     mask = mask >> (31 - (highBit-lowBit));
+     return mask & (whiskers >> lowBit);
+ }
+ 
  /*
   ///////////////////////
   // simultaneous scales!
@@ -131,23 +246,5 @@ void presetVoices()
   pisanoAddMIDINote (2, 75 - (2 * OCTAVE));    
   */
    
-#ifdef SIMULATE_TRIGGERS  
-void simulateTriggers()
-{
-  long now = millis();
-  static long lastTrigger[ PISANO_GENERATORS ];
-  
-  for( int i = 0; i < PISANO_GENERATORS; i ++ )
-  {
-    if( now < lastTrigger[i] ) // must be first time
-      lastTrigger[i] = now;
-      
-    if( now > lastTrigger[i] + 800l + (100*i)) // start at non-overlapping times
-    {
-      pisanoGenerateNote(i);
-      lastTrigger[i] = now;
-    }
-  }
-}
-#endif
+
 

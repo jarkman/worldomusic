@@ -3,8 +3,9 @@
 /////////////////////////////////////////////////////////////
 //globals for tune generator
 
-#define TUNE_LIST_SIZE 24
+#define TUNE_LIST_SIZE 40
 
+//#define LOG_TUNE
 
 unsigned short int tuneListMidiNote[TUNE_LIST_SIZE]; // MIDI note number
 unsigned int tuneListBeat[TUNE_LIST_SIZE];       // beat to start note on
@@ -92,6 +93,7 @@ void progressTune() // called from loop() repeatedly - work out if a note is due
 void logTuneProgress()
 {
       #ifdef DO_LOGGING
+      #ifdef LOG_TUNE
       Serial.print ("progressTune - next index: ");
       Serial.print (tuneNextListIndex, DEC); 
       Serial.print ("\n");
@@ -107,6 +109,7 @@ void logTuneProgress()
       Serial.print ("voice: ");
       Serial.print (tuneListVoice[ tuneNextListIndex ], DEC); 
       Serial.print ("\n");
+      #endif
       #endif
 }
       
