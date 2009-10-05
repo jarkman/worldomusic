@@ -9,9 +9,6 @@
 #define DO_LOGGING // NB - logging and GPS usage are incompatible! Do not leave Serial.out lines in place when DO_LOGGING is off!
 #define SIMULATE_GPS
 
-//#define SIMULATE_TRIGGERS  // turn on to test when we don't have input hardware
-
-
 
  unsigned long bitList( unsigned long whiskers, char*bits );
  unsigned long bitRange( unsigned long whiskers, int lowBit, int highBit );
@@ -100,7 +97,7 @@ void presetVoices()
    // the tune is built from latWhiskers and lonWhiskers
    // Each of those has 28 interesting bits, of which the low bits are obviously the most interesting
    
-   int beatMillisecs = 100 + (5 * bitList( latWhiskers, "0000 0000 0000 0000 0000 0011 1111" )); 
+   int beatMillisecs = 200 + (5 * bitList( latWhiskers, "0000 0000 0000 0000 0000 0011 1111" )); 
 
    int numBeats = 3 + bitList( lonWhiskers, "0000 0000 0000 0000 0000 0001 1111" ); // 0 to 32
    
@@ -112,7 +109,7 @@ void presetVoices()
    //                          | (bitList( latWhiskers, "0000 0000 0000 1111 1111 1111 1111" ));
    
    unsigned long beatMask = mixBits( lonWhiskers,  latWhiskers );  // alternate bits from the bottom 16 of the two coords
-   
+   unsigned long otherBeatMask = bitList(beatMask, "0101 0101 0101 0101 0101 0101 0101" ); 
  
    tuneDelete();
     
@@ -129,7 +126,14 @@ void presetVoices()
          volume = 2; // quieter
          
        if( bitIsSet( beatMask, beat ) || firstBeat )
-         tuneAddNote( 60 + (3 * (beat%2)), volume, beat, 0 );
+         tuneAddNote( 60 + (3 * (beat%barLength)), volume, beat, 0 );
+         
+       if( beat%2 == 0 )  
+         tuneAddNote( 50 - (beat%barLength), MAXVOLUME, beat,  1);
+         
+        
+        if( bitIsSet( otherBeatMask, beat ))
+         tuneAddNote( 40 + (beat%barLength), MAXVOLUME, beat,  2);
        
    }
  }

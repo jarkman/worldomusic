@@ -632,7 +632,7 @@ SIGNAL(PWM_INTERRUPT)  // every 32 microsecs, i.e. 31.25kHz
   
     
 
-    output += (fundamentalValue >> 3); // Sum the notes to get the total output
+    output += (fundamentalValue >> 4); // Sum the notes to get the total output
     
   } // end loop over NOTES
  
