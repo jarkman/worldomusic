@@ -409,7 +409,7 @@ void decode_gps(void)
 void simulate_gps()
 {
   static long nextGPSSimTime = 0;
-  static int nextString = 0;
+  static int nextString = -2;
   
   long now = millis();
   
@@ -418,7 +418,16 @@ void simulate_gps()
     
   // eg: lat 5142.0313  lon 00302.5582
    
-   nextString ++;
+  nextString ++;
+  
+   if( nextString < 0 )
+   {
+     gpsStatus = GPS_STATUS_NO_FIX;
+     return;
+   }
+   
+   gpsStatus = GPS_STATUS_FIX;
+   
    if( simLatStrings[nextString] == NULL )
      nextString = 0;
    
@@ -426,8 +435,9 @@ void simulate_gps()
   lonWhiskers = dec_min_to_whisker( simLonStrings[nextString] );
   lonWhiskers += 0x8000000L; // typically west
   
-  nextGPSSimTime = now + 6000;
+  nextGPSSimTime = now + 15000; // move to new place every 15 secs
 
+   
   #ifdef DO_LOGGING
      Serial.print ("simulate_gps - lat, lon: ");
            Serial.print ("\n");

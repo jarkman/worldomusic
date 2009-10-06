@@ -604,7 +604,7 @@ SIGNAL(PWM_INTERRUPT)  // every 32 microsecs, i.e. 31.25kHz
     fundamentalValue *= noteEnv[i];   // Apply envelope shaping
     
     //noteVolume[i] = 1;
-    fundamentalValue *= noteVolume[i];
+    fundamentalValue *= (int16_t) noteVolume[i];
     
 #ifdef DO_SWEEP
     if( noteSweepTicksTotal[i] != 0 )

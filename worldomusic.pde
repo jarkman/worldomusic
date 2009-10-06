@@ -55,22 +55,25 @@ void presetVoices()
   tuneSetVoice (1, VOICE_SINE);
   tuneSetVoice (2, VOICE_VIBRA);
   
-  tuneSetEnvelopeDelta (0, 600);
+  tuneSetEnvelopeDelta (0, 1200);
   tuneSetEnvelopeDelta (1, 600);
   tuneSetEnvelopeDelta (2, 300);
   
   tuneSetVibratoPercent (0, 15);
   
-  tuneSetEnvelope (0, ENVELOPE_SUSTAIN);
-  tuneSetEnvelope (1, ENVELOPE_EXP);
+  //tuneSetEnvelope (0, ENVELOPE_SUSTAIN);
+  //tuneSetEnvelope (1, ENVELOPE_EXP);
+  //tuneSetEnvelope (2, ENVELOPE_TREMOLO); 
+  tuneSetEnvelope (0, ENVELOPE_EXP);
+  tuneSetEnvelope (1, ENVELOPE_SUSTAIN);
   tuneSetEnvelope (2, ENVELOPE_TREMOLO);
   
  }
  
  void buildTuneFromPosition()
  {
-   static unsigned long lastLat = 0;
-   static unsigned long lastLon = 0;
+   static unsigned long lastLat = -1;
+   static unsigned long lastLon = -1;
    
    if( lonWhiskers == lastLon && latWhiskers == lastLat  ) //same position 
      return;
@@ -85,8 +88,10 @@ void presetVoices()
       Serial.print ("\n");
     #endif
     
-    
-    buildTune();
+    if( gpsStatus != GPS_STATUS_FIX  )
+      buildNoGpsTune();
+    else
+      buildTune();
     //buildTestTune();
  }
  
@@ -123,18 +128,34 @@ void presetVoices()
        if( firstBeat )
          volume = MAXVOLUME; // loudest
        else
-         volume = 2; // quieter
+         volume = 3; // quieter
          
        if( bitIsSet( beatMask, beat ) || firstBeat )
          tuneAddNote( 60 + (3 * (beat%barLength)), volume, beat, 0 );
          
        if( beat%2 == 0 )  
-         tuneAddNote( 50 - (beat%barLength), MAXVOLUME, beat,  1);
+         tuneAddNote( 50 - (beat%barLength), 2, beat,  1);
          
         
-        if( bitIsSet( otherBeatMask, beat ))
-         tuneAddNote( 40 + (beat%barLength), MAXVOLUME, beat,  2);
+       if( bitIsSet( otherBeatMask, beat ) )
+         tuneAddNote( 30 + (beat%barLength), 2, beat,  2);
        
+   }
+ }
+ 
+ void buildNoGpsTune()
+ {
+   
+   tuneDelete();
+    
+   tuneSetBeatInterval( 700 ); 
+  
+   int beat;
+   for( beat = 0; beat < 15; beat ++ )
+   {
+
+      tuneAddNote( 50 - beat,  MAXVOLUME, beat, 1 );
+      
    }
  }
  
