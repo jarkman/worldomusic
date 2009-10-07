@@ -42,7 +42,7 @@ void loop ()
 {
   progressEnvelopes();
   
-    decode_gps();  //Reads and average the sensors when is doing nothing...
+  decode_gps();  //Reads and average the sensors when is doing nothing...
 
   if( progressTune()) // only make a new tune when the old one finishes
    buildTuneFromPosition();
@@ -50,14 +50,15 @@ void loop ()
 
 void presetVoices()
  {
+  // down to 2 channels to make the GPS work
   
   tuneSetVoice (0, VOICE_SAWTOOTH);
   tuneSetVoice (1, VOICE_SINE);
-  tuneSetVoice (2, VOICE_VIBRA);
+  //tuneSetVoice (2, VOICE_VIBRA);
   
   tuneSetEnvelopeDelta (0, 1200);
   tuneSetEnvelopeDelta (1, 600);
-  tuneSetEnvelopeDelta (2, 300);
+  //tuneSetEnvelopeDelta (2, 300);
   
   tuneSetVibratoPercent (0, 15);
   
@@ -65,8 +66,8 @@ void presetVoices()
   //tuneSetEnvelope (1, ENVELOPE_EXP);
   //tuneSetEnvelope (2, ENVELOPE_TREMOLO); 
   tuneSetEnvelope (0, ENVELOPE_EXP);
-  tuneSetEnvelope (1, ENVELOPE_SUSTAIN);
-  tuneSetEnvelope (2, ENVELOPE_TREMOLO);
+  tuneSetEnvelope (1, ENVELOPE_ADSR);
+  //tuneSetEnvelope (2, ENVELOPE_TREMOLO);
   
  }
  
@@ -74,12 +75,14 @@ void presetVoices()
  {
    static unsigned long lastLat = -1;
    static unsigned long lastLon = -1;
+   static int lastGpsStatus = -1;
    
-   if( lonWhiskers == lastLon && latWhiskers == lastLat  ) //same position 
+   if( lonWhiskers == lastLon && latWhiskers == lastLat && lastGpsStatus == gpsStatus ) //same position 
      return;
     
     lastLon = lonWhiskers;
     lastLat = latWhiskers;
+    lastGpsStatus = gpsStatus;
     
     #ifdef DO_LOGGING
      Serial.print ("buildTuneFromPosition - lat, lon: ");
@@ -92,6 +95,7 @@ void presetVoices()
       buildNoGpsTune();
     else
       buildTune();
+      
     //buildTestTune();
  }
  
@@ -134,12 +138,12 @@ void presetVoices()
          tuneAddNote( 60 + (3 * (beat%barLength)), volume, beat, 0 );
          
        if( beat%2 == 0 )  
-         tuneAddNote( 50 - (beat%barLength), 2, beat,  1);
+         tuneAddNote( 50 - 4*(beat%2), 2, beat,  1);
          
-        
+        /* only got 2 voices now
        if( bitIsSet( otherBeatMask, beat ) )
          tuneAddNote( 30 + (beat%barLength), 2, beat,  2);
-       
+       */
    }
  }
  
@@ -147,11 +151,11 @@ void presetVoices()
  {
    
    tuneDelete();
-    
-   tuneSetBeatInterval( 700 ); 
+   
+   tuneSetBeatInterval( 1000 / (1 + gpsStatus));  // gets faster as it gets better
   
    int beat;
-   for( beat = 0; beat < 15; beat ++ )
+   for( beat = 0; beat < 3; beat ++ )
    {
 
       tuneAddNote( 50 - beat,  MAXVOLUME, beat, 1 );

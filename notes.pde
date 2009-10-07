@@ -1,4 +1,4 @@
-// Polyphonic sine generation
+// Polyphonic sine generation 
 // 
 // Richard Sewell,  richard@jarkman.co.uk
 //
@@ -24,34 +24,34 @@
 
 //#include "notes.h"
 
-unsigned char noteVolume[NOTES];             // overall note volume
+unsigned char noteVolume[CHANNELS];             // overall note volume
 
-unsigned char noteWorking[NOTES]; // Flag, non-zero to indicate note is active; zeroed when envelope decays to 0 
-long int noteStartTime[NOTES];    // Note start timestamp, in milliseconds
+unsigned char noteWorking[CHANNELS]; // Flag, non-zero to indicate note is active; zeroed when envelope decays to 0 
+long int noteStartTime[CHANNELS];    // Note start timestamp, in milliseconds
 
-unsigned char noteNumber[NOTES];  // Midi note number, 0..127
-unsigned char noteVoice[NOTES];   // Which voice to use for this note, 0..MAXVOICES
+unsigned char noteNumber[CHANNELS];  // Midi note number, 0..127
+unsigned char noteVoice[CHANNELS];   // Which voice to use for this note, 0..MAXVOICES
 
-uint16_t notePhase[NOTES];        // Phase in range 0..65535
-int16_t notePhaseDelta[NOTES];    // Add to phase every 32 microseconds (at 31.25kHz PWM frequency)
+uint16_t notePhase[CHANNELS];        // Phase in range 0..65535
+int16_t notePhaseDelta[CHANNELS];    // Add to phase every 32 microseconds (at 31.25kHz PWM frequency)
 
 
 #ifdef DO_SWEEP
 // Sweeping notes (variable frequency)
-int16_t noteSweepTicksTotal[NOTES];   // number of 32k ticks per increment of phaseDelta
-int16_t noteSweepTicker[NOTES];
-int16_t noteSweepTarget[NOTES]; // target value of phaseDelta for the sweep
+int16_t noteSweepTicksTotal[CHANNELS];   // number of 32k ticks per increment of phaseDelta
+int16_t noteSweepTicker[CHANNELS];
+int16_t noteSweepTarget[CHANNELS]; // target value of phaseDelta for the sweep
 #endif
 
 // Notes with variable amplitude (envelope shaping)
-unsigned int envelopePhase[NOTES];      // Envelope phase accumulator for this note 
-unsigned int envelopePhaseDelta[NOTES]; // Add to amplitude every 8 milliseconds (at 31.25kHz PWM frequency)
-unsigned char noteEnv[NOTES];        // Note envelope 0..255
-unsigned short int noteEnvOffset[NOTES]; // Offset from start of envelope ROM array
+unsigned int envelopePhase[CHANNELS];      // Envelope phase accumulator for this note 
+unsigned int envelopePhaseDelta[CHANNELS]; // Add to amplitude every 8 milliseconds (at 31.25kHz PWM frequency)
+unsigned char noteEnv[CHANNELS];        // Note envelope 0..255
+unsigned short int noteEnvOffset[CHANNELS]; // Offset from start of envelope ROM array
 
 
 #ifdef DO_VIBRATO
-int16_t vibratoOffset[NOTES];
+int16_t vibratoOffset[CHANNELS];
 int16_t vibratoCounter = 0;
 #endif
 
@@ -126,7 +126,7 @@ char wave[MAXVOICES][32] = {
 
 // Envelope look-up table in program memory (Flash ROM)
 PROGMEM prog_uchar env[MAXENVELOPES * 256] = {
-/* Envelope 0 */
+/* Envelope 0   ENVELOPE_LINEAR*/
   255, 254, 253, 252, 251, 250, 249, 248,
   247, 246, 245, 244, 243, 242, 241, 240,
   239, 238, 237, 236, 235, 234, 233, 232,
@@ -159,7 +159,7 @@ PROGMEM prog_uchar env[MAXENVELOPES * 256] = {
    23,  22,  21,  20,  19,  18,  17,  16,
    15,  14,  13,  12,  11,  10,   9,   8,
     7,   6,   5,   4,   3,   2,   1,   0,
-/* Envelope 1 */
+/* Envelope 1 ENVELOPE_EXP */
   255, 249, 244, 238, 233, 228, 223, 218,
   214, 209, 205, 200, 196, 192, 188, 183,
   180, 176, 172, 168, 164, 161, 157, 154,
@@ -192,7 +192,7 @@ PROGMEM prog_uchar env[MAXENVELOPES * 256] = {
     0,   0,   0,   0,   0,   0,   0,   0,
     0,   0,   0,   0,   0,   0,   0,   0,
     0,   0,   0,   0,   0,   0,   0,   0,
-/* Envelope 2 */
+/* Envelope 2 ENVELOPE_GATE */
   255, 255, 255, 255, 255, 255, 255, 255,
   255, 255, 255, 255, 255, 255, 255, 255,
   255, 255, 255, 255, 255, 255, 255, 255,
@@ -225,7 +225,7 @@ PROGMEM prog_uchar env[MAXENVELOPES * 256] = {
   255, 255, 255, 255, 255, 255, 255, 255,
   255, 255, 255, 255, 255, 255, 255, 255,
   255, 255, 255, 255, 255, 255, 255,   0,
-/* Envelope 3 */
+/* Envelope 3 ENVELOPE_ADSR  */
   255, 249, 244, 238, 233, 228, 223, 218,
   214, 209, 205, 200, 196, 192, 188, 183,
   180, 176, 172, 168, 164, 161, 157, 154,
@@ -258,7 +258,7 @@ PROGMEM prog_uchar env[MAXENVELOPES * 256] = {
     5,   4,   4,   3,   3,   3,   2,   2,
     2,   2,   1,   1,   1,   1,   1,   0,
     0,   0,   0,   0,   0,   0,   0,   0,
-/* Envelope 4 */
+/* Envelope 4 ENVELOPE_SUSTAIN  */
     0,  40,  74, 103, 128, 148, 165, 179,
   192, 202, 210, 217, 224, 229, 233, 236,
   240, 242, 244, 246, 248, 249, 250, 251,
@@ -291,7 +291,7 @@ PROGMEM prog_uchar env[MAXENVELOPES * 256] = {
     7,   6,   5,   5,   4,   4,   3,   3,
     3,   2,   2,   2,   1,   1,   1,   1,
     1,   0,   0,   0,   0,   0,   0,   0,
-/* Envelope 5 */
+/* Envelope 5 ENVELOPE_TREMOLO  */
   255, 249, 244, 238, 233, 228, 223, 218,
   214, 209, 205, 200, 196, 192, 188, 183,
   180, 176, 172, 168, 164, 161, 157, 154,
@@ -396,7 +396,7 @@ static void clearNotes (void)
 {
   int i;
   
-  for (i = 0; i < NOTES; i++) {
+  for (i = 0; i < CHANNELS; i++) {
     noteWorking[i] = 0;
   
     noteStartTime[i] = 0;
@@ -432,63 +432,63 @@ static void clearNotes (void)
 
 /* startNote --- start a note playing with a given MIDI note number, voice and envelope */
 
-void startNote (int note, int midiNoteNumber, unsigned char volume, int voice, int envelopeDelta, int envelope, int sweepMillisecs, int vibratoPercent)
+void startNote (int channel, int midiNoteNumber, unsigned char volume, int voice, int envelopeDelta, int envelope, int sweepMillisecs, int vibratoPercent)
 {
-  if ((note >= NOTES) || (voice >= MAXVOICES))
+  if ((channel >= CHANNELS) || (voice >= MAXVOICES))
     return;
     
-   noteWorking[note] = 1;
-   noteStartTime[note] = millis ();
+   noteWorking[channel] = 1;
+   noteStartTime[channel] = millis ();
    
-//LED_PORT ^= 1 << LED_BIT; // led toggles for each note
+//LED_PORT ^= 1 << LED_BIT; // led toggles for each channel
   
-  noteNumber[note] = midiNoteNumber;
-  noteVoice[note] = voice;
-  noteVolume[note] = volume;
+  noteNumber[channel] = midiNoteNumber;
+  noteVoice[channel] = voice;
+  noteVolume[channel] = volume;
   
-  notePhase[note] = 0;
+  notePhase[channel] = 0;
   
   int16_t basePhaseDelta = mapMidi (midiNoteNumber); // a notePhaseDelta of 2048 gives you 1kHz here
 
 #ifdef DO_SWEEP
   if (sweepMillisecs == 0) { 
-    notePhaseDelta[note] = basePhaseDelta;
-    noteSweepTicksTotal[note] = 0;
-    noteSweepTarget[note] = notePhaseDelta[note];  
+    notePhaseDelta[channel] = basePhaseDelta;
+    noteSweepTicksTotal[channel] = 0;
+    noteSweepTarget[channel] = notePhaseDelta[channel];  
   }
   else {
-    noteSweepTarget[ note ] = basePhaseDelta;
+    noteSweepTarget[ channel ] = basePhaseDelta;
    
    // number of 32k ticks per increment of phaseDelta
-    if( noteSweepTarget[note] == notePhaseDelta[note])
-      noteSweepTicksTotal[note] = 0;
+    if( noteSweepTarget[channel] == notePhaseDelta[channel])
+      noteSweepTicksTotal[channel] = 0;
     else  
-      noteSweepTicksTotal[note] = (sweepMillisecs << 5) / (noteSweepTarget[note] - notePhaseDelta[note]);
-    //noteSweepDelta[note] = (noteSweepTarget[note] - notePhaseDelta[note]) / (sweepMillisecs >> 3); // sweepMillisecs * 32 / 256
-    //if( noteTicksTotal[note] == 0 ) // can't go slow enough - note will never finish
+      noteSweepTicksTotal[channel] = (sweepMillisecs << 5) / (noteSweepTarget[channel] - notePhaseDelta[channel]);
+    //noteSweepDelta[channel] = (noteSweepTarget[channel] - notePhaseDelta[channel]) / (sweepMillisecs >> 3); // sweepMillisecs * 32 / 256
+    //if( noteTicksTotal[channel] == 0 ) // can't go slow enough - channel will never finish
     //  envelopeDelta = 100; // make the
       
-    noteSweepTicker[note] = 0;
+    noteSweepTicker[channel] = 0;
   }
 #else
   sweepMillisecs = 0;
-  notePhaseDelta[note] = basePhaseDelta;
+  notePhaseDelta[channel] = basePhaseDelta;
 #endif
       
-  if (envelopeDelta == 0) // forbid endless notes for the convenience of my random-note generation scheme
+  if (envelopeDelta == 0) // forbid endless notes for the convenience of my random-channel generation scheme
     envelopeDelta = 1; 
 
 #ifdef DO_VIBRATO
-  vibratoOffset[note] = basePhaseDelta >> 3; // we will add this to phaseDelta for half the vibrato cycle and subtract it for the other half
-  vibratoOffset[note] = (vibratoPercent * vibratoOffset[note]) / 100; // 25 percent is a rational value
-  if (vibratoOffset[note] < 1)
-    vibratoOffset[note] = 1;
+  vibratoOffset[channel] = basePhaseDelta >> 3; // we will add this to phaseDelta for half the vibrato cycle and subtract it for the other half
+  vibratoOffset[channel] = (vibratoPercent * vibratoOffset[channel]) / 100; // 25 percent is a rational value
+  if (vibratoOffset[channel] < 1)
+    vibratoOffset[channel] = 1;
 #endif
 
-  noteEnvOffset[note] = envelope * 256;  
-  noteEnv[note] = 255;
-  envelopePhase[note] = 0;  // Initialise envelope phase accumulator
-  envelopePhaseDelta[note] = envelopeDelta; // Add to volume every 8 msec
+  noteEnvOffset[channel] = envelope * 256;  
+  noteEnv[channel] = 255;
+  envelopePhase[channel] = 0;  // Initialise envelope phase accumulator
+  envelopePhaseDelta[channel] = envelopeDelta; // Add to volume every 8 msec
                                        // a value of 256 gives a 1-second envelope
   
 
@@ -502,15 +502,15 @@ int quietestNote (void)
 {
   int minNote = -1;
   int16_t minVolume = 0;
-  int i;
+  int channel;
   
-  for (i = 0; i < NOTES; i++) {
-    if (noteFinished (i))
-      return (i);
+  for (channel = 0; channel < CHANNELS; channel++) {
+    if (noteFinished (channel))
+      return (channel);
     
-    if (minVolume > envelopePhase[i]) {
-        minVolume = envelopePhase[i];  
-        minNote = i;
+    if (minVolume > envelopePhase[channel]) {
+        minVolume = envelopePhase[channel];  
+        minNote = channel;
     }
   }
 
@@ -520,20 +520,20 @@ int quietestNote (void)
 
 /* noteFinished --- not used, but needs updating */
 
-int noteFinished (int note)
+int noteFinished (int channel)
 {
-  return envelopePhase[note] == 65535U ||
-          (! noteWorking[note]) || 
-          millis() - noteStartTime[note] > 500 ; // so notes with no volume or pitch sweep still finish
-  //return envelopePhase[note] <= 0;
+  return envelopePhase[channel] == 65535U ||
+          (! noteWorking[channel]) || 
+          millis() - noteStartTime[channel] > 500 ; // so notes with no volume or pitch sweep still finish
+  //return envelopePhase[channel] <= 0;
 }
 
 
 /* startNoteStep --- not used, but needs updating */
 /*
-void startNoteStep (int note, int noteDelta, int minNoteNumber, int maxNoteNumber , int envelopeDelta)
+void startNoteStep (int channel, int noteDelta, int minNoteNumber, int maxNoteNumber , int envelopeDelta)
 {
-  int n = noteNumber[note] + noteDelta;
+  int n = noteNumber[channel] + noteDelta;
   
   if (n < minNoteNumber)
     n = maxNoteNumber;
@@ -541,7 +541,7 @@ void startNoteStep (int note, int noteDelta, int minNoteNumber, int maxNoteNumbe
   if (n > maxNoteNumber)
      n = minNoteNumber;
     
-   startNote (note, n, 0, envelopeDelta, 0, 200, 25); 
+   startNote (channel, n, 0, envelopeDelta, 0, 200, 25); 
 }
 */
 
@@ -555,25 +555,25 @@ void progressEnvelopes() // must be called from loop()
   if( now < nextProgressEnvelopeTime )
     return;
     
-   nextProgressEnvelopeTime = now + 8L;
+   nextProgressEnvelopeTime = now + 8L; // do this every 8 millisecs
     
-  for (int i = 0; i < NOTES; i++)
+  for (int channel = 0; channel < CHANNELS; channel++)
   {
       // Process volume every 256 times round the loop so we can have decent note lengths.
       // We go through here every 32*256 microsecs, 8 millisecs, 128 times / sec.
       // Apply envelope shaping to the note fundamental volume.
-      if (envelopePhase[i] < (65535U - envelopePhaseDelta[i])) 
+      if (envelopePhase[channel] < (65535U - envelopePhaseDelta[channel])) 
       {
-        envelopePhase[i] += envelopePhaseDelta[i];
-        e = envelopePhase[i] >> 8;
-        e += noteEnvOffset[i];
-        noteEnv[i] = pgm_read_byte_near (env + e);
+        envelopePhase[channel] += envelopePhaseDelta[channel];
+        e = envelopePhase[channel] >> 8;
+        e += noteEnvOffset[channel];
+        noteEnv[channel] = pgm_read_byte_near (env + e);
       }
       else 
       {
-        noteWorking[i] = 0;
-        noteEnv[i] = 0;
-        envelopePhase[i] = 65535U; // Note is done
+        noteWorking[channel] = 0;
+        noteEnv[channel] = 0;
+        envelopePhase[channel] = 65535U; // Note is done
       }
     }   
   }
@@ -583,47 +583,47 @@ SIGNAL(PWM_INTERRUPT)  // every 32 microsecs, i.e. 31.25kHz
   int16_t fundamentalValue;
 
   int16_t output = 0;
-  char i;
+  char channel;
   int e;
   
 
  
-  for (i = 0; i < NOTES; i++) {
+  for (channel = 0; channel < CHANNELS; channel++) {
     
-    notePhase[i] += notePhaseDelta[i]; // we just let it wrap when it overflows
+    notePhase[channel] += notePhaseDelta[channel]; // we just let it wrap when it overflows
   
 #ifdef DO_VIBRATO
     if (vibratoCounter > 0)
-      notePhase[i] += vibratoOffset[i];
+      notePhase[channel] += vibratoOffset[channel];
     else
-      notePhase[i] -= vibratoOffset[i];
+      notePhase[channel] -= vibratoOffset[channel];
 #endif
     
-    fundamentalValue = wave[noteVoice[i]][ notePhase[i] >> 11 ];  // gets from 16-bit down to our 5-bit wave table
+    fundamentalValue = wave[noteVoice[channel]][ notePhase[channel] >> 11 ];  // gets from 16-bit down to our 5-bit wave table
                                             // value is in range -127..127
-    fundamentalValue *= noteEnv[i];   // Apply envelope shaping
+    fundamentalValue *= noteEnv[channel];   // Apply envelope shaping
     
-    //noteVolume[i] = 1;
-    fundamentalValue *= (int16_t) noteVolume[i];
+    //noteVolume[channel] = 1;
+    fundamentalValue *= (int16_t) noteVolume[channel];
     
 #ifdef DO_SWEEP
-    if( noteSweepTicksTotal[i] != 0 )
+    if( noteSweepTicksTotal[channel] != 0 )
     {
-      noteSweepTicker[i] ++;
-      if( noteSweepTicker[i] >= abs( noteSweepTicksTotal[i] ))
+      noteSweepTicker[channel] ++;
+      if( noteSweepTicker[channel] >= abs( noteSweepTicksTotal[channel] ))
       {
-        noteSweepTicker[i] = 0;
-        if( noteSweepTicksTotal[i] > 0 )
-          notePhaseDelta[i] ++;
+        noteSweepTicker[channel] = 0;
+        if( noteSweepTicksTotal[channel] > 0 )
+          notePhaseDelta[channel] ++;
         else
-          notePhaseDelta[i] --;
+          notePhaseDelta[channel] --;
           
          
-        if( (int)notePhaseDelta[i] == (int)noteSweepTarget[i])
+        if( (int)notePhaseDelta[channel] == (int)noteSweepTarget[channel])
         {
-          notePhaseDelta[i] = noteSweepTarget[i];
-          noteSweepTicksTotal[i] = 0; //arrived, so stop
-          noteWorking[i] = 0;
+          notePhaseDelta[channel] = noteSweepTarget[channel];
+          noteSweepTicksTotal[channel] = 0; //arrived, so stop
+          noteWorking[channel] = 0;
         }
       }
     }        
@@ -634,7 +634,7 @@ SIGNAL(PWM_INTERRUPT)  // every 32 microsecs, i.e. 31.25kHz
 
     output += (fundamentalValue >> 4); // Sum the notes to get the total output
     
-  } // end loop over NOTES
+  } // end loop over CHANNELS
  
 #ifdef DO_VIBRATO
   if (volumeCounter == 0) { 

@@ -6,7 +6,7 @@
  NMEA variables
  **************************************************************************/
 
-/*GPS Pointers*/
+/*GPS Pointers*/ 
 char *token; //Some pointers
 char *search = ",";
 char *brkb, *pEnd;
@@ -431,8 +431,8 @@ void simulate_gps()
    if( simLatStrings[nextString] == NULL )
      nextString = 0;
    
-  latWhiskers = dec_min_to_whisker( simLatStrings[nextString] );
-  lonWhiskers = dec_min_to_whisker( simLonStrings[nextString] );
+  latWhiskers = dec_min_to_whiskers( simLatStrings[nextString] );
+  lonWhiskers = dec_min_to_whiskers( simLonStrings[nextString] );
   lonWhiskers += 0x8000000L; // typically west
   
   nextGPSSimTime = now + 15000; // move to new place every 15 secs
@@ -454,6 +454,39 @@ void simulate_gps()
     
 }
 #endif
+
+unsigned long dec_min_to_whiskers(char *token ) // where a whisker is 0.0001 minutes, which is our resolution
+{
+   unsigned long temp=0;
+   unsigned long whiskers=0;
+   unsigned long temp3=0;
+  
+   //Token contains lat/lon in degrees, decimal minutes. 
+   // (eg. 4750.1234 degrees decimal minutes = 47.835390 decimal degrees)
+   //Where 47 are degrees and 50 the minutes and .1234 the decimals of the minutes.
+
+ 
+   //taking only degrees, and minutes without decimals, 
+   //strtol stop parsing till reach the decimal point "."  result example 4750, eliminates .1234
+   temp=strtol (token,&pEnd,10);  // 4750
+   
+   unsigned long degs = temp / 100L;  // 47
+   unsigned long minutes = temp % 100L;  // 50
+   
+   //takes only the decimals of the minutes
+   //result example 1234. 
+   whiskers=strtol (pEnd+1,NULL,10);  // 1234
+
+   //joining degrees, minutes, and the decimals of minute, now without the point...
+   //Before was 4750.1234, now the result example is 47501234...
+   whiskers += minutes * 10000L;   // 501234
+   
+   whiskers += degs * 60L * 10000L; // 28,701,234
+
+
+   
+   return whiskers;  // max value is 108,000,000 0x66ff300, 27 bits, plus we will add a N/S or E/W to get 28 bits
+}  
 
 float dec_min_to_dec_deg(char *token )
 {
@@ -499,38 +532,7 @@ float dec_min_to_dec_deg(char *token )
    return deg;
 }
             
-unsigned long dec_min_to_whisker(char *token ) // where a whisker is 0.0001 minutes, which is our resolution
-{
-   unsigned long temp=0;
-   unsigned long whiskers=0;
-   unsigned long temp3=0;
-  
-   //Token contains lat/lon in degrees, decimal minutes. 
-   // (eg. 4750.1234 degrees decimal minutes = 47.835390 decimal degrees)
-   //Where 47 are degrees and 50 the minutes and .1234 the decimals of the minutes.
 
- 
-   //taking only degrees, and minutes without decimals, 
-   //strtol stop parsing till reach the decimal point "."  result example 4750, eliminates .1234
-   temp=strtol (token,&pEnd,10);  // 4750
-   
-   unsigned long degs = temp / 100L;  // 47
-   unsigned long minutes = temp % 100L;  // 50
-   
-   //takes only the decimals of the minutes
-   //result example 1234. 
-   whiskers=strtol (pEnd+1,NULL,10);  // 1234
-
-   //joining degrees, minutes, and the decimals of minute, now without the point...
-   //Before was 4750.1234, now the result example is 47501234...
-   whiskers += minutes * 10000L;   // 501234
-   
-   whiskers += degs * 60L * 10000L; // 28,701,234
-
-
-   
-   return whiskers;  // max value is 108,000,000 0x66ff300, 27 bits, plus we will add a N/S or E/W to get 28 bits
-}  
 
 
 void Wait_GPS_Fix(void)//Wait GPS fix...
@@ -558,6 +560,7 @@ void Wait_GPS_Fix(void)//Wait GPS fix...
 
 }
 
+/*
 void print_data(void)
 {
   static byte counter;
@@ -589,3 +592,4 @@ void print_data(void)
     
    
 }
+*/
