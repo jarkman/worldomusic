@@ -5,26 +5,23 @@ Work Items for World-O-Music
 Software
 ---------
 
-Sort out our terminology for notes & voices & channels and fix the code
+Add more scales of various lengths and styles
 
-Build tune generation, varying:
- - Speed
- - Notes in use
- - Specific notes in tune
- - Rhythm
- - Stress
- - Time signature ?
- - Voices in use ? 
- 
-Equalise volumes of the various voices
+Implement per-note lengths in tune.pde
+
+Find a drum voice somehow
+
+Implement a drum track which always has a doof at the start of the bar
+
+Stick with variable bar length (for now)
+
+Make tunes be a small multiple of bar length
+
+Melody track for subsequent bars should be a variation of melody for first bar
 
 
 Hardware
 ---------
-
-Measure current consumption of the hardware, work out if low-pass-filtering the PWM signal will save power
-
-Pick a battery pack to get a decent runtime
 
 Find an amp/speaker
 
