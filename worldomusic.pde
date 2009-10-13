@@ -6,13 +6,21 @@
 #include "tune.h"
 #include "NMEA.h"
 
-#define DO_LOGGING // NB - logging and GPS usage are incompatible! Do not leave Serial.out lines in place when DO_LOGGING is off!
-#define SIMULATE_GPS
+//#define DO_LOGGING // NB - logging and GPS usage are incompatible! Do not leave Serial.out lines in place when DO_LOGGING is off!
+//#define SIMULATE_GPS
+
+
+
+
+
+
 
 
  unsigned long bitList( unsigned long whiskers, char*bits );
  unsigned long bitRange( unsigned long whiskers, int lowBit, int highBit );
  unsigned long mixBits( unsigned long left, unsigned long right );
+ 
+int countBits( unsigned long left );
  
  int bitIsSet( unsigned long in, int bitNumber );
 
@@ -71,6 +79,57 @@ void presetVoices()
   
  }
  
+#define NUM_ACTIVES 5
+#define NUM_SCALES 2
+
+unsigned short int scaleA[] = { 55,57,59,60,62,64,65,0 };
+
+unsigned short int scaleB [] = { 45,47,49,50,52,54,55,0 };
+
+unsigned short int *scales[] = { scaleA, scaleB, NULL };
+
+
+unsigned short int activeNotes[CHANNELS][ NUM_ACTIVES ];
+int numActives[CHANNELS];
+
+
+void pickActivesFromPosition() // pick a set of active notes to play based on position 
+{
+  int scale = pickScaleFromPosition();
+  
+  for( int channel = 0; channel < CHANNELS; channel ++ )
+  {
+    int a  = 0;
+    for( int i = 0; scales[scale][i] != 0 && a < NUM_ACTIVES; i ++ )
+    {
+      unsigned long noteMask;
+      if( i == 0 )
+        noteMask = latWhiskers;
+       else
+       noteMask = lonWhiskers;
+       
+      if( bitIsSet( noteMask, i ))
+      {
+        activeNotes[channel][a] = scales[scale][i];
+        a++;
+       }
+    
+    }
+    
+    numActives[channel] = a;
+    
+    for( ; a < NUM_ACTIVES; a ++ )
+      activeNotes[channel][a] = 0;
+  }
+}
+
+int pickScaleFromPosition()
+{
+   int s = (countBits( bitList( latWhiskers, "0000 0000 0000 0000 0000 0011 1111" )) % NUM_SCALES );
+   return s;
+}
+
+
  void buildTuneFromPosition()
  {
    static unsigned long lastLat = -1;
@@ -103,6 +162,9 @@ void presetVoices()
  void buildTune()
  {
    
+   pickActivesFromPosition();
+   
+   
    // the tune is built from latWhiskers and lonWhiskers
    // Each of those has 28 interesting bits, of which the low bits are obviously the most interesting
    
@@ -134,11 +196,15 @@ void presetVoices()
        else
          volume = 3; // quieter
          
+       int channel = 0;
+       
        if( bitIsSet( beatMask, beat ) || firstBeat )
-         tuneAddNote( 60 + (3 * (beat%barLength)), volume, beat, 0 );
+         tuneAddNote( activeNotes[channel][beat%numActives[channel]], volume, beat, channel );
+         
+        channel = 1;
          
        if( beat%2 == 0 )  
-         tuneAddNote( 50 - 4*(beat%2), 2, beat,  1);
+         tuneAddNote( activeNotes[channel][beat%numActives[channel]], 2, beat,  channel);
          
         /* only got 2 voices now
        if( bitIsSet( otherBeatMask, beat ) )
@@ -214,6 +280,24 @@ void presetVoices()
    return out;
  }
  
+int countBits( unsigned long left )
+
+ {    
+   int count = 0;
+   unsigned long inBit = 1L;
+   
+   for( int i = 0; i < 32; i ++)
+   {
+     if( left & inBit )
+       count ++;;
+       
+    
+       inBit <<= 1;
+       
+   }
+   
+   return count;
+ }
  
  unsigned long bitList( unsigned long in, char*bits )  // collect the specified bits form 'in' and put them into the lowest bits of 'out'
  {
