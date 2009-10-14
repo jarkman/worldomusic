@@ -5,7 +5,7 @@ extern void initTune(); // called from setup - clean up our data structures
 extern void tuneDelete(); // destroy the existing tune
 
 
-extern void tuneAddNote( int noteNumber, unsigned char volume, int beat, int voice );
+extern void tuneAddNote( int noteNumber, unsigned char volume, unsigned int envelopeDelta, int beat, int voice );
 
 extern int progressTune(); // called from loop() repeatedly - work out if a note is due, and start it
 

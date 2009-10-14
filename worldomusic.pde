@@ -6,7 +6,7 @@
 #include "tune.h"
 #include "NMEA.h"
 
-#define DO_LOGGING // NB - logging and GPS usage are incompatible! Do not leave Serial.out lines in place when DO_LOGGING is off!
+//#define DO_LOGGING // NB - logging and GPS usage are incompatible! Do not leave Serial.out lines in place when DO_LOGGING is off!
 #define SIMULATE_GPS
 
 
@@ -60,13 +60,14 @@ void presetVoices()
  {
   // down to 2 channels to make the GPS work
   
-  tuneSetVoice (0, VOICE_SAWTOOTH);
+
+  tuneSetVoice (0, VOICE_VIBRA);
   tuneSetVoice (1, VOICE_SINE);
   //tuneSetVoice (2, VOICE_VIBRA);
   
-  tuneSetEnvelopeDelta (0, 1200);
-  tuneSetEnvelopeDelta (1, 600);
-  //tuneSetEnvelopeDelta (2, 300);
+  //tuneSetEnvelopeDelta (0, 1200);
+  //tuneSetEnvelopeDelta (1, 600);
+  ////tuneSetEnvelopeDelta (2, 300);
   
   tuneSetVibratoPercent (0, 15);
   
@@ -170,9 +171,9 @@ int pickScaleFromPosition()
    
    int beatMillisecs = 200 + (5 * bitList( latWhiskers, "0000 0000 0000 0000 0000 0011 1111" )); 
 
-   int numBeats = 3 + bitList( lonWhiskers, "0000 0000 0000 0000 0000 0001 1111" ); // 0 to 32
+   int numBeats; // = 3 + bitList( lonWhiskers, "0000 0000 0000 0000 0000 0001 1111" ); // 0 to 32
    
-   int barLength = 2 + bitList( lonWhiskers, "0000 0000 0000 0000 0000 0001 0011" ); 
+   int barLength = 4 + countBits( bitList( lonWhiskers, "0000 0000 0000 0000 0000 0000 0110" )); 
    
    numBeats = 3 * barLength;
    
@@ -190,27 +191,70 @@ int pickScaleFromPosition()
    int beat;
    for( beat = 0; beat < numBeats; beat ++ )
    {
-       boolean firstBeat = ((beat % barLength) == 0 ) ; // stress the first note of the 'bar'
+       int beatOfBar = (beat % barLength);
+       boolean firstBeat = ( beatOfBar == 0 ) ; // stress the first note of the 'bar'
+       
+       // drum line on channel 0
+       if( firstBeat )
+         doof( beat );
+       else
+         if( bitIsSet( beatMask, beatOfBar ))
+           tish( beat );
+       
+       
+       // melody on channel 1
+       int volume;
+       int delta;
+       
+       if( firstBeat )
+       {
+         volume = MAXVOLUME; // loudest
+         delta = ENVELOPE_DELTA_LONG;
+       }
+       else
+       {
+         volume = 3; // quieter
+         delta = ENVELOPE_DELTA_MEDIUM;
+       }
+        int channel = 1;
+        
+        int b = beatOfBar;
+        if( beatOfBar >=3 )  // so all bars start the same but vary after the 3rd beat
+          b = beat; 
+          
+        if( firstBeat || bitIsSet( otherBeatMask, b ))
+           tuneAddNote( activeNotes[channel][b%numActives[channel]], volume, delta, beat,  channel);
+
+        
+       /*
        if( firstBeat )
          volume = MAXVOLUME; // loudest
        else
          volume = 3; // quieter
+       
          
        int channel = 0;
        
        if( bitIsSet( beatMask, beat ) || firstBeat )
-         tuneAddNote( activeNotes[channel][beat%numActives[channel]], volume, beat, channel );
+         tuneAddNote( activeNotes[channel][beat%numActives[channel]], volume, ENVELOPE_DELTA_SHORT, beat, channel );
          
         channel = 1;
          
        if( beat%2 == 0 )  
-         tuneAddNote( activeNotes[channel][beat%numActives[channel]], 2, beat,  channel);
-         
-        /* only got 2 voices now
-       if( bitIsSet( otherBeatMask, beat ) )
-         tuneAddNote( 30 + (beat%barLength), 2, beat,  2);
-       */
+         tuneAddNote( activeNotes[channel][beat%numActives[channel]], 3, ENVELOPE_DELTA_MEDIUM, beat,  channel);
+      */   
+
    }
+ }
+ 
+ void doof( int beat )  // assuming  VOICE_VIBRA and ENVELOPE_EXP, this makes a drum-ish doof on channel 0
+ {
+   tuneAddNote( 40, MAXVOLUME, ENVELOPE_DELTA_SHORT, beat,  0);
+ }
+ 
+ void tish( int beat )
+ {
+   tuneAddNote( 80, MAXVOLUME, ENVELOPE_DELTA_TINY, beat,  0);
  }
  
  void buildNoGpsTune()
@@ -224,7 +268,7 @@ int pickScaleFromPosition()
    for( beat = 0; beat < 3; beat ++ )
    {
 
-      tuneAddNote( 50 - beat,  MAXVOLUME, beat, 1 );
+      tuneAddNote( 50 - beat,  MAXVOLUME, ENVELOPE_DELTA_SHORT, beat, 1 );
       
    }
  }
@@ -241,12 +285,12 @@ int pickScaleFromPosition()
    {
      
      if( beat%3 == 0 )
-        tuneAddNote( 50 + beat,  MAXVOLUME, beat, 0 );
+        tuneAddNote( 50 + beat,  MAXVOLUME, ENVELOPE_DELTA_SHORT, beat, 0 );
       
-      tuneAddNote( 60 + (3 * (beat%2)), MAXVOLUME, beat, 1 );
+      tuneAddNote( 60 + (3 * (beat%2)), MAXVOLUME, ENVELOPE_DELTA_SHORT, beat, 1 );
       
       if( beat%5 == 0 )
-        tuneAddNote( 50 + beat%2, MAXVOLUME, beat, 2 );
+        tuneAddNote( 50 + beat%2, MAXVOLUME, ENVELOPE_DELTA_SHORT, beat, 2 );
    }
  }
  

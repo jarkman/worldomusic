@@ -26,6 +26,12 @@
 #define ENVELOPE_SUSTAIN (4)   // Short exponential attack and decay
 #define ENVELOPE_TREMOLO (5)   // Like ADSR but with modulated sustain amplitude
 
+#define ENVELOPE_DELTA_TINY 2400
+#define ENVELOPE_DELTA_SHORT 1200
+#define ENVELOPE_DELTA_MEDIUM 600
+#define ENVELOPE_DELTA_LONG 300
+
+
 extern uint16_t maxMidi;
 
 extern void setupNotes (void);
