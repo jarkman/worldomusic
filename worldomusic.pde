@@ -6,8 +6,8 @@
 #include "tune.h"
 #include "NMEA.h"
 
-//#define DO_LOGGING // NB - logging and GPS usage are incompatible! Do not leave Serial.out lines in place when DO_LOGGING is off!
-//#define SIMULATE_GPS
+#define DO_LOGGING // NB - logging and GPS usage are incompatible! Do not leave Serial.out lines in place when DO_LOGGING is off!
+#define SIMULATE_GPS
 
 
 
