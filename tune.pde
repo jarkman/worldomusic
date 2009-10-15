@@ -3,7 +3,7 @@
 /////////////////////////////////////////////////////////////
 //globals for tune generator
 
-#define TUNE_LIST_SIZE 40 
+
 
 //#define LOG_TUNE
 

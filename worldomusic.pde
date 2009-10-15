@@ -149,6 +149,7 @@ int pickScaleFromPosition()
       Serial.print (latWhiskers, DEC); 
       Serial.print (lonWhiskers, DEC); 
       Serial.print ("\n");
+
     #endif
     
     if( gpsStatus != GPS_STATUS_FIX  )
@@ -169,13 +170,15 @@ int pickScaleFromPosition()
    // the tune is built from latWhiskers and lonWhiskers
    // Each of those has 28 interesting bits, of which the low bits are obviously the most interesting
    
-   int beatMillisecs = 200 + (5 * bitList( latWhiskers, "0000 0000 0000 0000 0000 0011 1111" )); 
+   int beatMillisecs = 100 + (20 * countBits(bitList( latWhiskers, "0000 0000 0000 0000 0000 0011 1111" ))); 
 
    int numBeats; // = 3 + bitList( lonWhiskers, "0000 0000 0000 0000 0000 0001 1111" ); // 0 to 32
    
-   int barLength = 4 + countBits( bitList( lonWhiskers, "0000 0000 0000 0000 0000 0000 0110" )); 
+   int barLength = 16; //4 + countBits( bitList( lonWhiskers, "0000 0000 0000 0000 0000 0000 0110" )); 
+   int numBars = 4;
+   int beatsBerDoof = 4;
    
-   numBeats = 3 * barLength;
+   numBeats = numBars * barLength;
    
    //unsigned long beatMask = (bitList( lonWhiskers, "0000 0000 0000 1111 1111 1111 1111" ) << 16)
    //                          | (bitList( latWhiskers, "0000 0000 0000 1111 1111 1111 1111" ));
@@ -189,17 +192,21 @@ int pickScaleFromPosition()
   
     int volume;
    int beat;
-   for( beat = 0; beat < numBeats; beat ++ )
+   for( beat = 0; beat < numBeats && beat < TUNE_LIST_SIZE; beat ++ )
    {
        int beatOfBar = (beat % barLength);
        boolean firstBeat = ( beatOfBar == 0 ) ; // stress the first note of the 'bar'
+       boolean doofBeat = (beatOfBar % beatsBerDoof) == 0;
        
        // drum line on channel 0
-       if( firstBeat )
+       if( doofBeat )
          doof( beat );
        else
-         if( bitIsSet( beatMask, beatOfBar ))
-           tish( beat );
+         if( bitIsSet( beatMask, beatOfBar ))        // note the use of 'beat of bar' instead of 'beat', so the doof-tish line always repeatsin each bar
+           if( bitIsSet( otherBeatMask, beatOfBar ))
+             doof( beat );
+           else
+             tish( beat );
        
        
        // melody on channel 1
@@ -219,7 +226,7 @@ int pickScaleFromPosition()
         int channel = 1;
         
         int b = beatOfBar;
-        if( beatOfBar >=3 )  // so all bars start the same but vary after the 3rd beat
+        if( beatOfBar >= barLength / 2 )  // so all bars start the same but vary at the end
           b = beat; 
           
         if( firstBeat || bitIsSet( otherBeatMask, b ))
