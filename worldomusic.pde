@@ -61,7 +61,7 @@ void presetVoices()
   // down to 2 channels to make the GPS work
   
 
-  tuneSetVoice (0, VOICE_VIBRA);
+  tuneSetVoice (0, VOICE_NOISE);
   tuneSetVoice (1, VOICE_SINE);
   //tuneSetVoice (2, VOICE_VIBRA);
   
@@ -256,12 +256,12 @@ int pickScaleFromPosition()
  
  void doof( int beat )  // assuming  VOICE_VIBRA and ENVELOPE_EXP, this makes a drum-ish doof on channel 0
  {
-   tuneAddNote( 40, MAXVOLUME, ENVELOPE_DELTA_SHORT, beat,  0);
+   tuneAddNote( 20, MAXVOLUME, ENVELOPE_DELTA_SHORT, beat,  0);
  }
  
  void tish( int beat )
  {
-   tuneAddNote( 80, MAXVOLUME, ENVELOPE_DELTA_TINY, beat,  0);
+   tuneAddNote( 40, MAXVOLUME, ENVELOPE_DELTA_TINY, beat,  0);
  }
  
  void buildNoGpsTune()
