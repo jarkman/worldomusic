@@ -28,6 +28,7 @@ int tuneNextBeat = 0; // beat value of the next note to play
 int tuneNextListIndex = 0; // index into note list
 
 long tuneBeatInterval = 500; // millisecs per beat
+int tuneBarLength = 4;
 int tuneNoteCount = 0;
 
 void setupTune() // called from setup - clean up our data structures
@@ -98,7 +99,7 @@ int progressTune() // called from loop() repeatedly - work out if a note is due,
     tuneNextBeat = 0;
   }
   
-  return tuneNextBeat == 0; // just begun!
+  return tuneNextBeat%tuneBarLength == 0; // bar just begun!
 }
 
 void logTuneProgress()
@@ -129,7 +130,10 @@ void tuneSetBeatInterval( int time )
   tuneBeatInterval = time;
 }
 
-
+void tuneSetBarLength( int barLength )
+{
+  tuneBarLength = barLength;
+}
 
 
 

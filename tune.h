@@ -13,3 +13,5 @@ extern int progressTune(); // called from loop() repeatedly - work out if a note
 
 
 extern void tuneSetBeatInterval( int time );
+
+extern void tuneSetBarLength( int barLength );

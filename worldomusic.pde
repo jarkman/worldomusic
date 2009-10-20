@@ -7,7 +7,7 @@
 #include "NMEA.h"
 
 //#define DO_LOGGING // NB - logging and GPS usage are incompatible! Do not leave Serial.out lines in place when DO_LOGGING is off!
-#define SIMULATE_GPS
+//#define SIMULATE_GPS
 
 
 
@@ -81,13 +81,16 @@ void presetVoices()
  }
  
 #define NUM_ACTIVES 5
-#define NUM_SCALES 2
+#define NUM_SCALES 6
 
-unsigned short int scaleA[] = { 55,57,59,60,62,64,65,0 };
+unsigned short int scaleMajor[] = { 0, 2, 4, 5, 7, 9, 11,  255 };
+unsigned short int scaleMinor[] = { 0, 2, 3, 5, 7, 8, 10,  255 };
+unsigned short int scaleAlteredMinor[] = { 0, 2, 3, 6, 7, 8, 11,  255 };
+unsigned short int scalePentatonic[] = { 0, 2, 4, 7, 9,  255 };
+unsigned short int scalePentatonicBlues[] = { 0, 3, 5, 6, 7, 10,  255 };
+unsigned short int scaleWholetone[] = { 0, 2, 4, 6, 8, 10,  255 };
 
-unsigned short int scaleB [] = { 45,47,49,50,52,54,55,0 };
-
-unsigned short int *scales[] = { scaleA, scaleB, NULL };
+unsigned short int *scales[] = { scaleMajor, scaleMinor, scaleAlteredMinor, scalePentatonic, scalePentatonicBlues, scaleWholetone, NULL };
 
 
 unsigned short int activeNotes[CHANNELS][ NUM_ACTIVES ];
@@ -97,22 +100,27 @@ int numActives[CHANNELS];
 void pickActivesFromPosition() // pick a set of active notes to play based on position 
 {
   int scale = pickScaleFromPosition();
+  int scaleStart = 30 + bitList( lonWhiskers, "0000 0000 0000 0000 0000 0011 1111" ) % 40; 
   
   for( int channel = 0; channel < CHANNELS; channel ++ )
   {
     int a  = 0;
-    for( int i = 0; scales[scale][i] != 0 && a < NUM_ACTIVES; i ++ )
+    int s = 0;
+    for( int i = 0;   a < NUM_ACTIVES; i ++ )
     {
-      unsigned long noteMask;
-      if( i == 0 )
-        noteMask = latWhiskers;
-       else
-       noteMask = lonWhiskers;
+      
        
-      if( bitIsSet( noteMask, i ))
+      if( bitIsSet( latWhiskers, i ) )
       {
-        activeNotes[channel][a] = scales[scale][i];
+        activeNotes[channel][a] = scales[scale][s] + scaleStart;
         a++;
+       }
+       
+       s++;
+       if(  scales[scale][s] > 250 )
+       {
+         s = 0;
+         scaleStart += 12;
        }
     
     }
@@ -123,6 +131,7 @@ void pickActivesFromPosition() // pick a set of active notes to play based on po
       activeNotes[channel][a] = 0;
   }
 }
+
 
 int pickScaleFromPosition()
 {
@@ -170,7 +179,7 @@ int pickScaleFromPosition()
    // the tune is built from latWhiskers and lonWhiskers
    // Each of those has 28 interesting bits, of which the low bits are obviously the most interesting
    
-   int beatMillisecs = 100 + (20 * countBits(bitList( latWhiskers, "0000 0000 0000 0000 0000 0011 1111" ))); 
+   int beatMillisecs = 100 + (10 * bitList( latWhiskers, "0000 0000 0000 0000 0000 0000 1111" )); 
 
    int numBeats; // = 3 + bitList( lonWhiskers, "0000 0000 0000 0000 0000 0001 1111" ); // 0 to 32
    
@@ -186,12 +195,17 @@ int pickScaleFromPosition()
    unsigned long beatMask = mixBits( lonWhiskers,  latWhiskers );  // alternate bits from the bottom 16 of the two coords
    unsigned long otherBeatMask = bitList(beatMask, "0101 0101 0101 0101 0101 0101 0101" ); 
  
+   int melodyModulus = 3 + countBits(bitList( lonWhiskers, "0000 0000 0000 0000 0000 0011 1111" ));
+   melodyModulus = 1 + (melodyModulus % (numActives[1] - 1)); // guarantee nonzero
+   
    tuneDelete();
     
    tuneSetBeatInterval( beatMillisecs ); 
-  
+   tuneSetBarLength( barLength );
     int volume;
    int beat;
+
+   int melodyModulatron = 0;
    for( beat = 0; beat < numBeats && beat < TUNE_LIST_SIZE; beat ++ )
    {
        int beatOfBar = (beat % barLength);
@@ -228,28 +242,14 @@ int pickScaleFromPosition()
         int b = beatOfBar;
         if( beatOfBar >= barLength / 2 )  // so all bars start the same but vary at the end
           b = beat; 
-          
-        if( firstBeat || bitIsSet( otherBeatMask, b ))
-           tuneAddNote( activeNotes[channel][b%numActives[channel]], volume, delta, beat,  channel);
-
         
-       /*
-       if( firstBeat )
-         volume = MAXVOLUME; // loudest
-       else
-         volume = 3; // quieter
-       
-         
-       int channel = 0;
-       
-       if( bitIsSet( beatMask, beat ) || firstBeat )
-         tuneAddNote( activeNotes[channel][beat%numActives[channel]], volume, ENVELOPE_DELTA_SHORT, beat, channel );
-         
-        channel = 1;
-         
-       if( beat%2 == 0 )  
-         tuneAddNote( activeNotes[channel][beat%numActives[channel]], 3, ENVELOPE_DELTA_MEDIUM, beat,  channel);
-      */   
+        melodyModulatron = (melodyModulatron + melodyModulus) % numActives[channel];
+        
+        if( firstBeat || bitIsSet( otherBeatMask, b ))
+           //tuneAddNote( activeNotes[channel][b%numActives[channel]], volume, delta, beat,  channel);
+           tuneAddNote( activeNotes[channel][melodyModulatron], 
+                       volume, delta, beat,  channel);
+  
 
    }
  }
