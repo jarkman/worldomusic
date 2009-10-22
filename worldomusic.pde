@@ -6,14 +6,8 @@
 #include "tune.h"
 #include "NMEA.h"
 
-//#define DO_LOGGING // NB - logging and GPS usage are incompatible! Do not leave Serial.out lines in place when DO_LOGGING is off!
-//#define SIMULATE_GPS
-
-
-
-
-
-
+#define DO_LOGGING // NB - logging and GPS usage are incompatible! Do not leave Serial.out lines in place when DO_LOGGING is off!
+#define SIMULATE_GPS
 
 
  unsigned long bitList( unsigned long whiskers, char*bits );
@@ -60,7 +54,6 @@ void presetVoices()
  {
   // down to 2 channels to make the GPS work
   
-
   tuneSetVoice (0, VOICE_NOISE);
   tuneSetVoice (1, VOICE_SINE);
   //tuneSetVoice (2, VOICE_VIBRA);
@@ -80,18 +73,22 @@ void presetVoices()
   
  }
  
-#define NUM_ACTIVES 5
-#define NUM_SCALES 6
+#define NUM_ACTIVES 12
+#define NUM_SCALES 1
 
 unsigned short int scaleMajor[] = { 0, 2, 4, 5, 7, 9, 11,  255 };
 unsigned short int scaleMinor[] = { 0, 2, 3, 5, 7, 8, 10,  255 };
+unsigned short int scaleFudgePentatonic[] = { 0, 0, 2, 4, 7, 7, 9,  255 }; // fudge the pentatonic scale to have 8 notes (repeat the root and fifth degree)
+unsigned short int *scales[] = { scaleMajor, scaleMinor, scaleFudgePentatonic, NULL };
+
+/* phill temporary - omit these more exotic scales for now
+unsigned short int *scales[] = { scaleMajor, scaleMinor, scaleAlteredMinor, scalePentatonic, scalePentatonicBlues, NULL };
 unsigned short int scaleAlteredMinor[] = { 0, 2, 3, 6, 7, 8, 11,  255 };
-unsigned short int scalePentatonic[] = { 0, 2, 4, 7, 9,  255 };
 unsigned short int scalePentatonicBlues[] = { 0, 3, 5, 6, 7, 10,  255 };
-unsigned short int scaleWholetone[] = { 0, 2, 4, 6, 8, 10,  255 };
-
-unsigned short int *scales[] = { scaleMajor, scaleMinor, scaleAlteredMinor, scalePentatonic, scalePentatonicBlues, scaleWholetone, NULL };
-
+unsigned short int scalePentatonic[] = { 0, 2, 4, 7, 9,  255 };
+unsigned short int scaleFudgePentatonic[] = { 0, 0, 2, 4, 7, 7, 9,  255 }; // fudge the pentatonic scale to have 8 notes (repeat the root and fifth degree)
+unsigned short int scaleFudgePentatonicBlues[] = { 0, 3, 5, 6, 6, 7, 10, 10,  255 }; // fudge the pentatonic scale to have 8 notes (repeat the "blue" notes)
+*/
 
 unsigned short int activeNotes[CHANNELS][ NUM_ACTIVES ];
 int numActives[CHANNELS];
@@ -100,21 +97,67 @@ int numActives[CHANNELS];
 void pickActivesFromPosition() // pick a set of active notes to play based on position 
 {
   int scale = pickScaleFromPosition();
+  
+  /* phill temporary -  pick the whole scale (for debugging purposes)
+  for( int channel = 0; channel < CHANNELS; channel ++ )
+  {
+    int a  = 0; // count of allowed notes we've pulled out of the chosen scale 
+    int s = 0; // index into the chosen scale we're pulling from
+    
+    for( int i = 0; a < NUM_ACTIVES; i ++ )
+    {
+      activeNotes[channel][a] = scales[scale][s] + 24; // was "+ scaleStart" - this forces a (low octave) 'C' rootNote
+     
+      a++;
+      s++;
+      
+       if(  scales[scale][s] > 250 )
+       {
+         s = 0;
+         scaleStart += 12;
+       }
+    }
+    numActives[channel] = a;
+    
+    // what's this for?
+    // looks like sets the end of the active notes list to zero
+    for( ; a < NUM_ACTIVES; a ++ )
+      activeNotes[channel][a] = 0;
+  }
+  */
+   
+  // phill temporary - maybe call this rootNote? (lowest note in the list of allowed active notes)
   int scaleStart = 30 + bitList( lonWhiskers, "0000 0000 0000 0000 0000 0011 1111" ) % 40; 
   
+  // phill temporary - this choses a list of allowed notes (actives)
+  // favouring the root, fourth, and fifth degree of the scale
+  // it DOES also pick other notes but the gps latWhiskers in the simulateGPS() tends
+  // to result in mostly roots and fifths (which is no bad thing if we're aiming to imitatate western melodies)
   for( int channel = 0; channel < CHANNELS; channel ++ )
   {
     int a  = 0;
     int s = 0;
-    for( int i = 0;   a < NUM_ACTIVES; i ++ )
+    int root_fourth_fifth = 0; // 0 = root, 3 = fourth, 4 = fifth
+    
+    for( int i = 0; a < NUM_ACTIVES; i ++ )
     {
-      
-       
+    
+      // favour root and fifth notes
       if( bitIsSet( latWhiskers, i ) )
-      {
+      { // if the latitude bits are set - alternate between placing a root or fifth note
+        activeNotes[channel][a] = scales[scale][root_fourth_fifth] + scaleStart;
+        
+        // alternate between picking a root or fifth
+        if (root_fourth_fifth == 0) root_fourth_fifth = 4;
+        else root_fourth_fifth = 0;
+
+        a++;
+      }
+      else
+      { // otherwise ascend through the scale as normal
         activeNotes[channel][a] = scales[scale][s] + scaleStart;
         a++;
-       }
+      }
        
        s++;
        if(  scales[scale][s] > 250 )
@@ -129,7 +172,17 @@ void pickActivesFromPosition() // pick a set of active notes to play based on po
     
     for( ; a < NUM_ACTIVES; a ++ )
       activeNotes[channel][a] = 0;
-  }
+
+
+  #ifdef DO_LOGGING
+    Serial.print ("Chanl "); Serial.print (channel, DEC);
+    Serial.print (" activenotes: ");
+    for( int i = 0; i < NUM_ACTIVES; i ++ ){
+      Serial.print (activeNotes[channel][i], DEC);
+    }
+  #endif
+  }// channel loop
+  
 }
 
 
@@ -179,7 +232,7 @@ int pickScaleFromPosition()
    // the tune is built from latWhiskers and lonWhiskers
    // Each of those has 28 interesting bits, of which the low bits are obviously the most interesting
    
-   int beatMillisecs = 100 + (10 * bitList( latWhiskers, "0000 0000 0000 0000 0000 0000 1111" )); 
+   int beatMillisecs = 200 + (5 * bitList( latWhiskers, "0000 0000 0000 0000 0000 0000 1111" )); 
 
    int numBeats; // = 3 + bitList( lonWhiskers, "0000 0000 0000 0000 0000 0001 1111" ); // 0 to 32
    
@@ -195,7 +248,7 @@ int pickScaleFromPosition()
    unsigned long beatMask = mixBits( lonWhiskers,  latWhiskers );  // alternate bits from the bottom 16 of the two coords
    unsigned long otherBeatMask = bitList(beatMask, "0101 0101 0101 0101 0101 0101 0101" ); 
  
-   int melodyModulus = 3 + countBits(bitList( lonWhiskers, "0000 0000 0000 0000 0000 0011 1111" ));
+   int melodyModulus = countBits(bitList( lonWhiskers, "0000 0000 0000 0000 0000 0011 1111" ));
    melodyModulus = 1 + (melodyModulus % (numActives[1] - 1)); // guarantee nonzero
    
    tuneDelete();
@@ -237,19 +290,34 @@ int pickScaleFromPosition()
          volume = 3; // quieter
          delta = ENVELOPE_DELTA_MEDIUM;
        }
+
         int channel = 1;
         
+        
         int b = beatOfBar;
+        /* phill temporary - don't repeat bars
         if( beatOfBar >= barLength / 2 )  // so all bars start the same but vary at the end
-          b = beat; 
+          b = beat;
+        */ 
         
+        // chaotically pick notes from the "allowed notes" activeNotes list
         melodyModulatron = (melodyModulatron + melodyModulus) % numActives[channel];
-        
-        if( firstBeat || bitIsSet( otherBeatMask, b ))
-           //tuneAddNote( activeNotes[channel][b%numActives[channel]], volume, delta, beat,  channel);
+      
+        if( b == firstBeat){ // always start from the root note
+           tuneAddNote( activeNotes[channel][0], 
+                       volume, delta, beat, channel);
+        }
+        else if (bitIsSet( otherBeatMask, beatOfBar ) && beatOfBar<(numBeats-4)){
            tuneAddNote( activeNotes[channel][melodyModulatron], 
-                       volume, delta, beat,  channel);
-  
+                       volume, delta, beat, channel);
+        }
+        
+        
+        /* phill - temporary climb up the "allowed notes" on every beat (for debugging purposes)
+         melodyModulatron = (melodyModulatron + 1) % numActives[channel];
+         tuneAddNote( activeNotes[channel][melodyModulatron], 
+                       volume, delta, beat, channel);
+        */
 
    }
  }
@@ -382,46 +450,6 @@ int countBits( unsigned long left )
      mask = mask >> (31 - (highBit-lowBit));
      return mask & (whiskers >> lowBit);
  }
- 
- /*
-  ///////////////////////
-  // simultaneous scales!
-  // c# and d# pentatonic
-  ///////////////////////
-  
-  // sequence lengths 16,20,24
-  
-  // c# pentatonic scale
-  // starting from c#
-  // - extending 1 note extra past the octave
-  // 7 notes total - produces sequence of 16 notes
-  pisanoAddMIDINote (0, 61);
-  pisanoAddMIDINote (0, 64);
-  pisanoAddMIDINote (0, 66);
-  pisanoAddMIDINote (0, 68);
-  pisanoAddMIDINote (0, 71);
-  pisanoAddMIDINote (0, 73);
-  pisanoAddMIDINote (0, 76);
-  
-  // c# pentatonic scale
-  // starting from f#
-  // 5 notes total - produces sequence of 20 notes
-  pisanoAddMIDINote (1, 66 + OCTAVE);
-  pisanoAddMIDINote (1, 68 + OCTAVE);
-  pisanoAddMIDINote (1, 71 + OCTAVE);
-  pisanoAddMIDINote (1, 73 + OCTAVE);
-  pisanoAddMIDINote (1, 76 + OCTAVE);
-  
-  // d# pentatonic scale
-  // starting from d# and repeating at the octave
-  // 6 notes total - produces a sequence of 24 notes
-  pisanoAddMIDINote (2, 63 - (2 * OCTAVE));
-  pisanoAddMIDINote (2, 66 - (2 * OCTAVE));
-  pisanoAddMIDINote (2, 68 - (2 * OCTAVE));
-  pisanoAddMIDINote (2, 71 - (2 * OCTAVE));
-  pisanoAddMIDINote (2, 73 - (2 * OCTAVE));
-  pisanoAddMIDINote (2, 75 - (2 * OCTAVE));    
-  */
    
 
 
