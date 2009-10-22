@@ -386,6 +386,46 @@ void decode_gps(void)
 
 #ifdef SIMULATE_GPS
 
+// smooth progression on two axes:
+
+ char* simLatStrings[] = { 
+                           "5142.0306",
+                           "5142.0307",
+                           "5142.0308",
+                           "5142.0309",
+                           
+                           "5142.0310",
+                           "5142.0311",
+                           "5142.0312",
+                           "5142.0313",
+                           
+                           "5142.0314",
+                           "5142.0315",
+                           "5142.0316",
+                           "5142.0317",
+
+                            NULL } ;
+                            
+ char* simLonStrings[] = { "00302.5582",
+                           "00302.5583",
+                           "00302.5584",
+                           "00302.5585",
+                           
+                          "00302.5586",
+                           "00302.5587",
+                           "00302.5588",
+                          "00302.5589",
+                          
+                           "00302.5590",
+                           "00302.5591",
+                          "00302.5592",
+                           "00302.5593",
+                           
+ 
+                           
+                           NULL };
+                           
+/*
 // phill temporary - changed this so we jump around a lot to begin with, then settle down in the 5142 area
 
  char* simLatStrings[] = { 
@@ -408,7 +448,7 @@ void decode_gps(void)
                            "00302.5022",
                            "00302.5945",
                            NULL };                        
- 
+ */
  /* hold still on the longitude                          
  char* simLonStrings[] = { "00302.5582",
                            "00302.5582",
