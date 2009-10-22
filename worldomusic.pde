@@ -6,8 +6,8 @@
 #include "tune.h"
 #include "NMEA.h"
 
-#define DO_LOGGING // NB - logging and GPS usage are incompatible! Do not leave Serial.out lines in place when DO_LOGGING is off!
-#define SIMULATE_GPS
+//#define DO_LOGGING // NB - logging and GPS usage are incompatible! Do not leave Serial.out lines in place when DO_LOGGING is off!
+//#define SIMULATE_GPS
 
 
  unsigned long bitList( unsigned long whiskers, char*bits );
@@ -55,21 +55,17 @@ void presetVoices()
   // down to 2 channels to make the GPS work
   
   tuneSetVoice (0, VOICE_NOISE);
-  tuneSetVoice (1, VOICE_SINE);
-  //tuneSetVoice (2, VOICE_VIBRA);
-  
-  //tuneSetEnvelopeDelta (0, 1200);
-  //tuneSetEnvelopeDelta (1, 600);
-  ////tuneSetEnvelopeDelta (2, 300);
+  //tuneSetVoice (1, VOICE_SINE);
+  tuneSetVoice (1, VOICE_BRASS);
+
   
   tuneSetVibratoPercent (0, 15);
   
-  //tuneSetEnvelope (0, ENVELOPE_SUSTAIN);
-  //tuneSetEnvelope (1, ENVELOPE_EXP);
-  //tuneSetEnvelope (2, ENVELOPE_TREMOLO); 
+
   tuneSetEnvelope (0, ENVELOPE_EXP);
-  tuneSetEnvelope (1, ENVELOPE_ADSR);
-  //tuneSetEnvelope (2, ENVELOPE_TREMOLO);
+  //tuneSetEnvelope (1, ENVELOPE_ADSR);
+  tuneSetEnvelope (1, ENVELOPE_EXP);
+
   
  }
  
@@ -126,8 +122,8 @@ void pickActivesFromPosition() // pick a set of active notes to play based on po
   }
   */
    
-  // phill temporary - maybe call this rootNote? (lowest note in the list of allowed active notes)
-  int scaleStart = 30 + bitList( lonWhiskers, "0000 0000 0000 0000 0000 0011 1111" ) % 40; 
+  // rootNote (lowest note in the list of allowed active notes) varies, but only for large movements 
+  int rootNote = 30 + bitList( lonWhiskers, "0000 0000 0000 0000 0000 0011 1000" ) % 40; 
   
   // phill temporary - this choses a list of allowed notes (actives)
   // favouring the root, fourth, and fifth degree of the scale
@@ -145,17 +141,19 @@ void pickActivesFromPosition() // pick a set of active notes to play based on po
       // favour root and fifth notes
       if( bitIsSet( latWhiskers, i ) )
       { // if the latitude bits are set - alternate between placing a root or fifth note
-        activeNotes[channel][a] = scales[scale][root_fourth_fifth] + scaleStart;
+        activeNotes[channel][a] = scales[scale][root_fourth_fifth] + rootNote;
         
         // alternate between picking a root or fifth
-        if (root_fourth_fifth == 0) root_fourth_fifth = 4;
-        else root_fourth_fifth = 0;
+        if (root_fourth_fifth == 0) 
+          root_fourth_fifth = 4;
+        else 
+          root_fourth_fifth = 0;
 
         a++;
       }
       else
       { // otherwise ascend through the scale as normal
-        activeNotes[channel][a] = scales[scale][s] + scaleStart;
+        activeNotes[channel][a] = scales[scale][s] + rootNote;
         a++;
       }
        
@@ -163,7 +161,7 @@ void pickActivesFromPosition() // pick a set of active notes to play based on po
        if(  scales[scale][s] > 250 )
        {
          s = 0;
-         scaleStart += 12;
+         rootNote += 12;
        }
     
     }
@@ -232,7 +230,7 @@ int pickScaleFromPosition()
    // the tune is built from latWhiskers and lonWhiskers
    // Each of those has 28 interesting bits, of which the low bits are obviously the most interesting
    
-   int beatMillisecs = 200 + (5 * bitList( latWhiskers, "0000 0000 0000 0000 0000 0000 1111" )); 
+   int beatMillisecs = 200 + (5 * bitList( latWhiskers, "0000 0000 0000 0000 0000 0000 1111" ));  // vary smoothly with latitude
 
    int numBeats; // = 3 + bitList( lonWhiskers, "0000 0000 0000 0000 0000 0001 1111" ); // 0 to 32
    
@@ -303,11 +301,14 @@ int pickScaleFromPosition()
         // chaotically pick notes from the "allowed notes" activeNotes list
         melodyModulatron = (melodyModulatron + melodyModulus) % numActives[channel];
       
-        if( b == firstBeat){ // always start from the root note
+        if( firstBeat )
+        { // always start from the root note
            tuneAddNote( activeNotes[channel][0], 
                        volume, delta, beat, channel);
         }
-        else if (bitIsSet( otherBeatMask, beatOfBar ) && beatOfBar<(numBeats-4)){
+        else if (bitIsSet( otherBeatMask, beatOfBar ) // use beatOfBar not beat so the timing of notes is constant across bars even when the note  choice isn't
+                    && beatOfBar<(numBeats-4))
+        {
            tuneAddNote( activeNotes[channel][melodyModulatron], 
                        volume, delta, beat, channel);
         }
@@ -343,7 +344,7 @@ int pickScaleFromPosition()
    for( beat = 0; beat < 3; beat ++ )
    {
 
-      tuneAddNote( 50 - beat,  MAXVOLUME, ENVELOPE_DELTA_SHORT, beat, 1 );
+      tuneAddNote( 50 - beat,  MAXVOLUME - beat, ENVELOPE_DELTA_SHORT, beat, 1 );
       
    }
  }
